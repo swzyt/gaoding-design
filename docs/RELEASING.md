@@ -6,7 +6,7 @@
 
 1. 更新插件 package.json 版本，运行 `bash scripts/check.sh`。
 2. 仓库根运行 `mkdir -p dist`，再 `npm pack ./dsh-plugin-gaoding-publisher --pack-destination ./dist`。prepack 从白名单复制运行文件，包含运行依赖锁文件，不包含已安装依赖、用户资料、历史素材或凭证。
-3. 运行 `node scripts/verify-package.mjs dist/dsh-plugin-gaoding-publisher-0.3.3.tgz`，验证解包运行、CommonJS 模块边界、运行源码哈希和禁入文件。
+3. 运行 `node scripts/verify-package.mjs dist/dsh-plugin-gaoding-publisher-0.3.4.tgz`，验证解包运行、CommonJS 模块边界、运行源码哈希和禁入文件。
 4. 记录 `shasum -a 256 dist/*.tgz`，把验证结果留在 docs/VALIDATION.md。
 
 ## 独立 profile 测试

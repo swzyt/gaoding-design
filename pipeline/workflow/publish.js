@@ -118,11 +118,9 @@ async function verify(page,recipePath,options={}) {
  state.managementStatus=card.status;state.verifiedAt=new Date().toISOString();
  await page.screenshot({path:path.join(out,'publication-verified.png')});
  await write(file,state);
- // Inspect the actual response triggered by the visible copyright entry, without replaying authentication.
+ // Open the real copyright entry (发布列表卡片右下角「…」→「版权认证」), then inspect the responses it triggers.
  await page.cdp('Network.enable');await page.events();
- await page.evaluate(desc=>[...document.images].find(i=>i.alt===desc).parentElement.parentElement.querySelector('button[aria-label="更多"]').click(),recipe.description);
- await page.waitForFunction(()=>{const e=document.querySelector('[data-action="open-copyright-declaration"]');return e&&getComputedStyle(e.closest('.gda-dropdown')).opacity==='1'},undefined,{timeout:5000});
- await page.click('[data-action="open-copyright-declaration"]');
+ await copyrightFlow.openPanel(page,{description:recipe.description});
  let versions,content;
  for(let i=0;i<40&&!versions?.length&&!content;i++){
   for(const event of await page.events()){

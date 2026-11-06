@@ -36,6 +36,16 @@ gaoding_workflow args=["status","同一绝对运行目录"]
 9. `04-final`：看每张隐藏截图、刷新恢复图、每画板编辑器图并对照母稿；检查层的独立性、透明边缘、文字可编辑、字体、裁切、间距与来源。写 `release/visual-review.json`（`passed:true,spec_sha256,checks`）和 `material-review.json`（`passed:true,bindings_sha256,checks`），哈希必须来自当前文件。不能凭文件存在或图层数量通过。
 10. 总控继续 `copyright_and_form → submit → complete_declaration → reopen_verify → package`。所有图片先登记、绑定再声明，图片层数必须等于候选数量。AI 来源用 `original_ai`，程序绘制用 `original`；分别上传真实证明。重新打开发布管理和版权面板检查保存结果。审核中、审核通过、审核不通过按实际显示，不混称。
 
+### 版权声明入口（2026-11-06 实测，勿按旧记忆找面板）
+
+- 发布列表入口是 **我的 → 发布 → 内容卡片右下角「…」→「版权认证」**，点开即「版权声明」弹窗。
+- 编辑器右上角那个叫「**版权说明**」，只是一段文案（“当前作品无版权风险…”），**不是**声明面板；按「版权说明/声明面板」去搜索会误判成“平台没提供”。
+- 发布成功弹窗里可能有「去完善」直达同一弹窗，但不是必现，不能作为唯一入口。
+- 弹窗结构：未分类 / 稿定素材 / **原创素材** / **原创 AI 素材** / 非原创素材 五个拖拽分区，选择器前缀 `.ugc-copyright-section-<分类>`；缩略图 `.ugc-copyright-thumb`（带 `data-candidate-id`），证明材料 `.ugc-copyright-evidence-thumb`。
+- 提交前必须：未分类为 0、每类图片数与登记表一致、每个用到的分类都有证明材料、勾选「我知悉并勾选《确权声明》」，再点「声明并发布」。
+- 分区已只读（`.is-readonly`、file input `disabled`）说明声明已保存；必须重新从同一入口打开确认分类和材料仍在，才算核验通过。
+- 代码：`copyright.js:openPanel` 负责走这个入口；`publish.js` 的 `verify`/`completeDeclaration` 都复用它，不要再写自定义选择器。
+
 每个 gate 的 `request.json` 给出当前 token、输入哈希和要求。完成实际观察与指定文件后，原子写 `response.json`，包括 `passed:true`、相同 `token`、具体观察的 `checks`，以及该阶段要求的 action。失败就记录具体原因，不写假的通过结果。输入变化后旧响应必须归档重审。
 
 ## 配方与可编辑性

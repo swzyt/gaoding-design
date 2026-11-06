@@ -9,7 +9,7 @@
 通过 DSH Plugin Manager 安装发行的 `.tgz`，或使用官方 CLI：
 
 ```bash
-dsh plugin --profile desktop add /absolute/path/dsh-plugin-gaoding-publisher-0.3.3.tgz
+dsh plugin --profile desktop add /absolute/path/dsh-plugin-gaoding-publisher-0.3.4.tgz
 ```
 
 更新已加载的旧版本后重启 DSH。包内包含流水线，不需要原开发工作区。若从源码目录链接安装，先在仓库根运行 `node scripts/prepare-plugin.mjs`。

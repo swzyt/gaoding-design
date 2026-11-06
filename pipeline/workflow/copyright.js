@@ -74,3 +74,23 @@ async function verify(page,recipePath){
  await page.screenshot({path:path.join(out,'copyright-verified-v2.png')});await write(path.join(out,'copyright-verification.json'),result);return result;
 }
 module.exports={inspect,resolve,validate,prepare,submit,verify};
+
+// Live entry verified 2026-11-06: 我的 → 发布 → 卡片右下角「…」，菜单第四项是「版权认证」（不是「版权说明」）；
+// 点开即「版权声明」弹窗，含 未分类/稿定/原创/原创AI/非原创 五个 .ugc-copyright-section-* 分区。
+// 发布成功弹窗的「去完善」也可直达；编辑器右上角的「版权说明」只是一段说明文案。
+async function openPanel(page,{listUrl='https://www.gaoding.com/my/publish',description}={}){
+ if(!(await page.url()).startsWith(listUrl))await page.goto(listUrl,{timeout:60000});
+ await page.waitForFunction(desc=>[...document.images].some(i=>i.alt===desc),description,{timeout:60000});
+ if(await inspect(page))return true;
+ await page.evaluate(desc=>{
+  const card=[...document.images].find(i=>i.alt===desc).parentElement.parentElement;
+  const trigger=card.querySelector('button[aria-label="更多"]')||card.querySelector('.gda-dropdown-trigger');
+  if(!trigger)throw Error('Publication card has no 更多 trigger');
+  trigger.click();
+ },description);
+ await page.waitForFunction(()=>[...document.querySelectorAll('.gda-dropdown-menu-item')].some(e=>e.innerText.trim()==='版权认证'),undefined,{timeout:15000});
+ await page.evaluate(()=>[...document.querySelectorAll('.gda-dropdown-menu-item')].find(e=>e.innerText.trim()==='版权认证').click());
+ await page.waitForFunction(()=>[document,...[...document.querySelectorAll('iframe')].map(f=>f.contentDocument).filter(Boolean)].some(d=>d.querySelector('.ugc-copyright-section')),undefined,{timeout:30000});
+ return true;
+}
+module.exports.openPanel=openPanel;

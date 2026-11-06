@@ -1,6 +1,6 @@
 {
   "name": "dsh-plugin-gaoding-publisher",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "话题化稿定模板投稿：选择话题后由 Agent 全自动完成研究、创意、分层、导入、投稿与版权声明",
   "type": "module",
   "main": "index.js",

@@ -1,3 +1,24 @@
+# 0.3.4 版权声明入口修正
+
+日期：2026-11-06（Asia/Shanghai）。本次修正「版权声明入口判断错误」。
+
+## 错在哪
+
+- 之前 `publish.js` 的 `verify` 用了一个并不存在的选择器 `[data-action="open-copyright-declaration"]` 去打开版权声明弹窗；跑演唱会宣传出圈这条时该入口不存在，于是被判成“平台没提供面板”。
+- 实际入口是 **我的 → 发布 → 内容卡片右下角「…」→「版权认证」**，点开就是「版权声明」弹窗（未分类 / 稿定 / 原创 / 原创 AI / 非原创 五个分区）。编辑器右上角的「版权说明」只是一段说明文案，不是面板。
+
+## 改动
+
+- `pipeline/workflow/copyright.js` 新增 `openPanel(page,{description})`：导航到发布列表 → 找到对应卡片 → 点「更多」→ 点「版权认证」→ 等 `.ugc-copyright-section` 出现。
+- `pipeline/workflow/publish.js` 的 `verify` 改用 `copyrightFlow.openPanel`，删除失效选择器。
+- `pipeline/workflow/WORKFLOW.md` 增加「版权声明入口」小节：正确入口、容易混淆的叫法、弹窗结构与提交/核验要求。
+- `test-copyright.cjs` 增加入口回归用例：断言 openPanel 会导航到发布列表并点「版权认证」。
+- `bash scripts/check.sh` 全部通过（Python 9 项、失败注入 20 项、submit 守卫、版权 CMS 身份、版权入口、Node 8 项、prepare-plugin 重建 runtime）。
+
+## 线上后果
+
+- 作品 202295493 已用正确入口完成声明，并重新打开核验：原创 8 张、原创 AI 2 张、未分类 0、两类证明材料均已保存（见 `build/sound-wave-tour/release/copyright-verified-v2.png`），交付包已重新生成。
+
 # 0.3.3 修复记录
 
 日期：2026-11-06（Asia/Shanghai）。本次修复弹层“白底白字、标题看不见”。
