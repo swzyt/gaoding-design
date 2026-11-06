@@ -1,0 +1,4 @@
+# 把 gaoding-publisher 挂进 profile 宿主组合
+- insert:
+    - id: gaoding-publisher
+      name: dsh-plugin-gaoding-publisher

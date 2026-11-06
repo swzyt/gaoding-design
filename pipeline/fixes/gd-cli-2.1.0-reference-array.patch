@@ -1,0 +1,23 @@
+--- fixes/tool-api-adapter.original.js	2026-11-05 08:42:27
++++ /opt/homebrew/lib/node_modules/@gaoding/cli/dist/src/features/tool/tool-api-adapter.js	2026-11-05 08:41:27
+@@ -327,7 +327,19 @@
+                 }, parseIntent);
+                 return {
+                     ...intent,
+-                    arguments: { ...withoutEmptyOptionalMedia(intent.arguments, invocation.optionalMediaParameters), ...invocation.explicitArguments }
++                    arguments: {
++                        ...withoutEmptyOptionalMedia(intent.arguments, invocation.optionalMediaParameters),
++                        ...Object.fromEntries(Object.entries(invocation.explicitArguments).map(([key, value]) => {
++                            // Intent describes the backend wire type; public URI arrays stay arrays at the CLI boundary.
++                            const wireValue = intent.arguments[key];
++                            if (Array.isArray(value) && typeof wireValue === "string") {
++                                try {
++                                    if (Array.isArray(JSON.parse(wireValue))) return [key, JSON.stringify(value)];
++                                } catch {}
++                            }
++                            return [key, value];
++                        }))
++                    }
+                 };
+             });
+         signal.throwIfAborted();

@@ -1,0 +1,32 @@
+{
+  "birthday": {
+    "topic": "偶像生日应援局",
+    "specs": "小红书封面 1242x1656；生日主视觉 1242x2688/1242x1656；突出艺人姓名、生日日期、祝福主题；人物照片与文字可替换；粉丝站/应援会；原创严禁照搬；男艺人方向居多",
+    "hub": "https://www.gaoding.com/topics/JPx41oDL34KzGCpT",
+    "specs_note": "摘要仅用于选题；以本次详情页和规范为准"
+  },
+  "drama": {
+    "topic": "向全世界安利新剧",
+    "specs": "手机海报 1242x2208/小红书 1242x1656；角色安利、开播提醒、倒计时、成绩战报；突出作品名/角色名/人设关键词/代表台词/开播时间；严禁 Logo/二维码/价格",
+    "hub": "https://www.gaoding.com/topics/Yo0d79bxVA-2Od14",
+    "specs_note": "摘要仅用于选题；以本次详情页和规范为准"
+  },
+  "goods": {
+    "topic": "应援周边自己做",
+    "specs": "小卡 60x96mm（正反2画板）、明信片 151x103mm、手幅 456x156mm、吧唧 81x81mm、票根；每款配展示海报 1242x2688/1656；正反面完整；成套；不能使用明星姓名；原创严禁照搬",
+    "hub": "https://www.gaoding.com/topics/qJ1eMppX50FqSV6B",
+    "specs_note": "摘要仅用于选题；以本次详情页和规范为准"
+  },
+  "concert": {
+    "topic": "我的演唱会现场",
+    "specs": "手机海报 1242x2208/小红书 1656；现场感/观众视角/Live 氛围；歌单与场次信息可改；严禁真实艺人姓名与Logo",
+    "hub": "https://www.gaoding.com/topics/q8aed0Znw7p_SJNJ",
+    "specs_note": "摘要仅用于选题；以本次详情页和规范为准"
+  },
+  "tour": {
+    "topic": "演唱会宣传出圈",
+    "specs": "手机海报 1242x2208；主标题大字+舞台摄影；场馆/日期/票价/开票时间分层；严禁真实艺人姓名与Logo；原创",
+    "hub": "https://www.gaoding.com/topics/g2OYoH1u5lrFUGxs",
+    "specs_note": "摘要仅用于选题；以本次详情页和规范为准"
+  }
+}

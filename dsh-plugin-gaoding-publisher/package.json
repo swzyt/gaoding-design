@@ -1,0 +1,49 @@
+{
+  "name": "dsh-plugin-gaoding-publisher",
+  "version": "0.3.3",
+  "description": "话题化稿定模板投稿：选择话题后由 Agent 全自动完成研究、创意、分层、导入、投稿与版权声明",
+  "type": "module",
+  "main": "index.js",
+  "files": [
+    "index.js",
+    "runtime-host.js",
+    "runner.js",
+    "client.js",
+    "cordis.patch.yml",
+    "skill",
+    "runtime",
+    "locale",
+    "icon.svg",
+    "README.md"
+  ],
+  "engines": {
+    "dsh": ">=0.2.0 <0.3.0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-slots"
+      ]
+    }
+  },
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "license": "UNLICENSED",
+  "os": [
+    "darwin"
+  ],
+  "scripts": {
+    "prepack": "node ../scripts/prepare-plugin.mjs",
+    "test": "node --test test-plugin.mjs"
+  }
+}
