@@ -232,6 +232,8 @@ export async function createMaterialFromGenerated({ unit, canvas, python }) {
     sha256,
     alpha: hasTransparentPixels,
     alpha_range: alphaRange ? [alphaRange.min, alphaRange.max] : null,
+    assetMode: elementMode ? 'element' : 'scene',
+    element: elementStats,
     model: checked.model ?? 'image-gen',
     provider: checked.provider ?? null,
     sourceUri: null,

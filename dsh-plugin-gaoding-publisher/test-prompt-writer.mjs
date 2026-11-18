@@ -89,3 +89,31 @@ test('missing model or LLM service fails loudly', async () => {
     await assert.rejects(() => generateUnitPrompt({ job, unit, llm: { stream() {} }, selection: {} }), /没有可用的默认模型/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test('material prompts demand a single transparent element or a full background', async () => {
+  const { buildPromptRequest } = await import('./prompt-writer.js');
+  const materialJob = { topic: { name: '特效系列光效素材' }, kind: 'material', note: '' };
+  const elementUnit = { index: 1, brief: { direction: '点光', canvas: ['2000×2000'], quantity: 1, assetMode: 'element', assetModeReason: '规范要求元素可独立使用' } };
+  const element = buildPromptRequest({ job: materialJob, unit: elementUnit, spec: null });
+  assert.match(element.user, /单个元素/);
+  assert.match(element.user, /纯透明/);
+  assert.match(element.user, /8% 透明边距/);
+  assert.match(element.user, /形态判定依据/);
+
+  const sceneUnit = { ...elementUnit, brief: { ...elementUnit.brief, assetMode: 'scene' } };
+  const scene = buildPromptRequest({ job: materialJob, unit: sceneUnit, spec: null });
+  assert.match(scene.user, /整张背景图/);
+  assert.doesNotMatch(scene.user, /8% 透明边距/);
+});
+
+test('asset mode is detected from the spec and frozen into the brief', async () => {
+  const { assetMode } = await import('./spec-catalog.js');
+  const { briefFor } = await import('./jobs-store.js');
+  const elementSpec = { text: '创作可重复使用、灵活叠加组合的点光、光束等基础光效元素，元素可独立使用、自由组合' };
+  const sceneSpec = { text: '征集冬季场景的展台背景，背景1620*2880px；背景干净高级；背景适配电商主图' };
+  assert.equal(assetMode(elementSpec).mode, 'element');
+  assert.equal(assetMode(sceneSpec).mode, 'scene');
+  const brief = briefFor({ topic: { name: 't' }, spec: elementSpec, index: 1, quantity: 1, note: '' });
+  assert.equal(brief.assetMode, 'element');
+  assert.ok(brief.assetModeReason);
+});

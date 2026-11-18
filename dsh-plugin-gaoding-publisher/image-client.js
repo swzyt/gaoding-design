@@ -247,3 +247,32 @@ function pngSize(file) {
     return { w: buffer.readUInt32BE(16), h: buffer.readUInt32BE(20), colorType: buffer[25] };
   } catch { return null; }
 }
+
+/**
+ * 元素素材的透明统计：最小 alpha、不透明覆盖率、四边最大 alpha。
+ * 平台要求「元素可独立使用」，判据是：真透明底 + 主体不贴边 + 不是整版图。
+ */
+export function alphaStats({ python, file }) {
+  return new Promise((resolve, reject) => {
+    const script = [
+      'import sys, json',
+      'from PIL import Image',
+      'im = Image.open(sys.argv[1]).convert("RGBA")',
+      'w, h = im.size',
+      'a = im.getchannel("A"); px = a.load()',
+      'opaque = sum(1 for y in range(0, h, 2) for x in range(0, w, 2) if px[x, y] > 16)',
+      'total = ((w + 1) // 2) * ((h + 1) // 2)',
+      'edge = 0',
+      'step_x = max(1, w // 200); step_y = max(1, h // 200)',
+      'for x in range(0, w, step_x):',
+      '    edge = max(edge, px[x, 0], px[x, h - 1])',
+      'for y in range(0, h, step_y):',
+      '    edge = max(edge, px[0, y], px[w - 1, y])',
+      'print(json.dumps({"minAlpha": min(a.getdata()), "maxAlpha": max(a.getdata()), "coverage": opaque / total, "borderMax": edge}))'
+    ].join('\n');
+    execFile(python, ['-c', script, file], { timeout: 60000 }, (error, stdout, stderr) => {
+      if (error) return reject(Error('素材透明统计失败：' + String(stderr || error.message).slice(0, 200)));
+      try { resolve(JSON.parse(stdout.trim())); } catch (parseError) { reject(parseError); }
+    });
+  });
+}

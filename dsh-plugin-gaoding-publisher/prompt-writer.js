@@ -16,11 +16,30 @@ const system = [
   '5. 只输出 JSON 本体。'
 ].join('\n');
 
+const MATERIAL_ELEMENT_RULES = [
+  '交付形态：**单个元素**，可在设计里独立使用、自由组合（不要把整张成品场景当成素材）。',
+  '背景必须纯透明：主体之外完全透明，不要给背景铺色、不要做渐变底、不要加投影底板。',
+  '主体居中，四周至少留 8% 透明边距，主体不贴边、不被裁切。',
+  '主体占画布面积 30%–75%，不要铺满整张画布。',
+  '画面里不出现任何文字、数字、Logo、二维码、水印；纯元素本身。',
+  '边缘干净锐利、无白边、无杂色残留；光线统一，不要在主体周围堆叠复杂场景。'
+].join('\n- ');
+
+const MATERIAL_SCENE_RULES = [
+  '交付形态：**整张背景图**，铺满画布、无透明区域。',
+  '画面保持干净，中心或指定区域留出可放置产品的空间。',
+  '不出现任何文字、Logo、二维码、水印。'
+].join('\n- ');
+
 export function buildPromptRequest({ job, unit, spec }) {
   const brief = unit.brief ?? {};
+  const assetMode = brief.assetMode === 'scene' ? 'scene' : 'element';
   const lines = [
     '话题：' + (job.topic?.name ?? ''),
-    '类型：' + (job.kind === 'material' ? '素材话题（产出单张素材图）' : '模板话题（分层可编辑模板）'),
+    '类型：' + (job.kind === 'material'
+      ? (assetMode === 'element' ? '素材话题（产出单个可独立使用的透明元素）' : '素材话题（产出整张背景图）')
+      : '模板话题（分层可编辑模板）'),
+    job.kind === 'material' ? '素材交付要求：\n- ' + (assetMode === 'element' ? MATERIAL_ELEMENT_RULES : MATERIAL_SCENE_RULES) : null,
     '本单元方向：' + (brief.direction ?? '自定'),
     brief.canvas?.length ? '画布：' + brief.canvas.join(' 或 ') + ' px' : null,
     brief.forbidden?.length ? '禁止事项：\n- ' + brief.forbidden.join('\n- ') : null,
@@ -28,6 +47,7 @@ export function buildPromptRequest({ job, unit, spec }) {
     job.note ? '用户额外要求：' + job.note : null,
     '单元序号：' + (unit.index ?? 1) + ' / ' + (brief.quantity ?? 1) + '（同话题多个单元必须彼此有差异）',
     spec?.directions?.length ? '规范里的其它方向（不要与本次方向重复）：\n- ' + spec.directions.slice(0, 6).join('\n- ') : null,
+    brief.assetModeReason ? '形态判定依据：' + brief.assetModeReason : null,
     spec?.text ? '规范原文摘录：\n' + String(spec.text).slice(0, 1500) : null
   ].filter(Boolean);
   return { system, user: lines.join('\n\n') };

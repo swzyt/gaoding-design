@@ -372,3 +372,33 @@ test('a published material run reports published status instead of a failed chec
   assert.match(row.label, /已投稿/);
   assert.match(row.detail, /202456591/);
 });
+
+test('element assets require real transparency, margin and sane coverage', async () => {
+  const { mkdtempSync, mkdirSync, writeFileSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { checkMaterialRun } = await import('./publish-check.js');
+  const root = mkdtempSync(join(tmpdir(), 'element-check-'));
+  // 造一张合法 PNG 头（4x4 RGBA）
+  const png = Buffer.alloc(33);
+  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(png, 0);
+  png.writeUInt32BE(13, 8); png.write('IHDR', 12, 'ascii');
+  png.writeUInt32BE(2000, 16); png.writeUInt32BE(2000, 20); png[24] = 8; png[25] = 6;
+  writeFileSync(join(root, 'asset.png'), png);
+  const base = { schema: 1, kind: 'material', topic: '话题', canvas: { w: 2000, h: 2000 }, asset: 'asset.png', alpha: true, alpha_range: [0, 255], assetMode: 'element' };
+  writeFileSync(join(root, 'material.json'), JSON.stringify({ ...base, sha256: 'x', element: { minAlpha: 0, borderMax: 0, coverage: 0.4 } }));
+  const ok = checkMaterialRun(root);
+  assert.ok(ok.checks.find(check => check.id === 'element_alpha').ok);
+  assert.ok(ok.checks.find(check => check.id === 'element_border').ok);
+  assert.ok(ok.checks.find(check => check.id === 'element_coverage').ok);
+
+  // 整版图（覆盖率 98%）应当被拦
+  writeFileSync(join(root, 'material.json'), JSON.stringify({ ...base, sha256: 'x', element: { minAlpha: 0, borderMax: 255, coverage: 0.98 } }));
+  const bad = checkMaterialRun(root);
+  assert.equal(bad.checks.find(check => check.id === 'element_coverage').ok, false);
+  assert.equal(bad.checks.find(check => check.id === 'element_border').ok, false);
+
+  // 缺透明度（最小 alpha 232）也要拦
+  writeFileSync(join(root, 'material.json'), JSON.stringify({ ...base, sha256: 'x', element: { minAlpha: 232, borderMax: 255, coverage: 0.4 } }));
+  assert.equal(checkMaterialRun(root).checks.find(check => check.id === 'element_alpha').ok, false);
+});

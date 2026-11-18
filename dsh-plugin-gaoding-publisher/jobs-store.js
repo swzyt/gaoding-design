@@ -6,6 +6,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { assetMode } from './spec-catalog.js';
 
 export const maxQuantity = 20;
 const idPattern = /^[A-Za-z0-9_-]{1,80}$/;
@@ -107,6 +108,9 @@ export function briefFor({ topic, spec, index, quantity, note }) {
     forbidden: Array.isArray(spec?.forbidden) ? spec.forbidden.slice(0, 4) : [],
     materials: Array.isArray(spec?.materials) ? spec.materials.slice(0, 4) : [],
     note: String(note ?? ''),
+    // 素材稿的交付形态（元素/整图）在建任务时冻结，避免后续规范变化让产物口径漂移。
+    assetMode: spec ? assetMode(spec).mode : 'element',
+    assetModeReason: spec ? assetMode(spec).reason : '没有规范快照，按元素交付',
     source: spec ? { fetchedAt: spec.fetchedAt ?? null, url: spec.url ?? null } : null
   };
 }

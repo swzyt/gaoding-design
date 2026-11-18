@@ -52,12 +52,23 @@ export function checkMaterialRun(runDir) {
   const canvas = material.canvas ?? null;
   add('asset_size', '素材尺寸符合规范', !!(size && canvas && size.w === canvas.w && size.h === canvas.h),
     size && canvas ? size.w + '×' + size.h + ' / 规范 ' + canvas.w + '×' + canvas.h : '无法读取尺寸');
-  const needAlpha = material.alpha === true;
+  const needAlpha = (material.assetMode ?? 'scene') === 'element' ? true : material.alpha === true;
   const declared = Array.isArray(material.alpha_range) ? material.alpha_range : null;
   const hasAlphaChannel = size ? (size.colorType === 6 || size.colorType === 4) : false;
   const alphaOk = !needAlpha || (hasAlphaChannel && Array.isArray(declared) && declared[0] === 0);
   add('asset_alpha', '贴纸类素材有透明背景', alphaOk,
     needAlpha ? (hasAlphaChannel ? (declared ? 'alpha ' + declared.join('–') : '缺少 alpha_range 记录') : 'PNG 没有 alpha 通道') : '非贴纸素材，不要求透明');
+  // 元素类素材（平台要求「可独立使用」）：真透明底、主体不贴边、不是整版图。
+  if ((material.assetMode ?? 'scene') === 'element') {
+    const stats = material.element ?? null;
+    const minAlpha = stats ? stats.minAlpha : (Array.isArray(declared) ? declared[0] : null);
+    add('element_alpha', '元素素材是真透明底', minAlpha === 0,
+      minAlpha === null ? '缺少元素透明统计（需重新生成）' : '最小 alpha ' + minAlpha);
+    add('element_border', '元素四周留出透明边距', stats ? stats.borderMax <= 16 : false,
+      stats ? '四边最大 alpha ' + Math.round(stats.borderMax) : '缺少边缘统计');
+    add('element_coverage', '元素不是整版图', stats ? stats.coverage >= 0.03 && stats.coverage <= 0.85 : false,
+      stats ? '不透明覆盖率 ' + (stats.coverage * 100).toFixed(1) + '%（要求 3%–85%）' : '缺少覆盖率统计');
+  }
   const hash = exists ? sha(asset) : null;
   add('asset_sha', '素材哈希与记录一致', !!(hash && material.sha256 && hash === material.sha256),
     hash ? (material.sha256 ? '哈希一致' : '记录缺 sha256') : '无法计算哈希');

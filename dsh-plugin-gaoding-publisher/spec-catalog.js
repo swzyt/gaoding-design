@@ -324,3 +324,35 @@ export async function refreshSpecs(options) {
   }
   return result;
 }
+
+/**
+ * 素材话题的交付形态：元素 vs 整图。
+ *
+ * 平台审核实测（2026-11-18）：元素类话题的整图作品会被判「需元素抠图或者分层」；
+ * 背景类话题（如「美妆个护上新背景」）交付整图则正常通过。
+ * 依据规范原文判断，而不是靠话题名猜。
+ */
+export function assetMode(spec) {
+  const text = String(spec?.text ?? '') + ' ' + (spec?.excerpt ?? '') + ' ' + (spec?.directions ?? []).join(' ');
+  // 「元素」必须单独成词才算元素类；「背景」出现多次则视为整图类。
+  const elementSignals = ['元素可独立使用', '自由组合', '单体完整', '单体', '抠图', '分层', '可独立使用', '基础光效元素', '元素可', '艺术字及配套元素'];
+  const sceneSignals = ['背景素材', '背景图', '场景背景', '满版背景', '上新背景', '展台背景', '背景】', '背景16', '背景：', '背景，'];
+  const backgroundMentions = (text.match(/背景/g) ?? []).length;
+  const elementMentions = (text.match(/元素/g) ?? []).length;
+  // 背景出现 >=3 次且元素为 0 → 整图背景类
+  if (backgroundMentions >= 3 && elementMentions === 0) {
+    return { mode: 'scene', reason: '规范主体是整张背景（背景出现 ' + backgroundMentions + ' 次，未提元素）' };
+  }
+  const elementHits = elementSignals.filter(word => text.includes(word));
+  const sceneHits = sceneSignals.filter(word => text.includes(word));
+  if (elementHits.length && !sceneHits.length) {
+    return { mode: 'element', reason: '规范要求元素可独立使用（命中：' + elementHits.slice(0, 3).join('、') + '）' };
+  }
+  if (sceneHits.length && !elementHits.length) {
+    return { mode: 'scene', reason: '规范要求整张背景（命中：' + sceneHits.slice(0, 2).join('、') + '）' };
+  }
+  if (elementHits.length && sceneHits.length) {
+    return { mode: 'element', reason: '规范同时提到元素与背景，按更严格的元素交付（命中：' + elementHits[0] + '）' };
+  }
+  return { mode: 'element', reason: '规范未明确，按平台默认（元素可独立使用）交付' };
+}
