@@ -33,6 +33,7 @@ test('a fully configured environment reports ok with no blocking items', async (
       runtimeHome: join(root, 'runtime'),
       version: '9.9.9',
       resolveCredential: async key => (key === 'CODEX_OAUTH_1' ? '{"accessToken":"x"}' : null),
+      resolvePackage: name => (name === 'dsh-image-gen' ? { version: '0.11.3' } : null),
       execFileImpl: fakeExec(),
       exists: () => true
     });
@@ -42,6 +43,7 @@ test('a fully configured environment reports ok with no blocking items', async (
     assert.equal(result.version, '9.9.9');
     assert.ok(result.checks.some(check => check.id === 'python' && check.status === 'ok'));
     assert.ok(result.checks.some(check => check.id === 'image-gen' && check.status === 'ok'));
+    assert.ok(result.checks.some(check => check.id === 'image-plugin' && check.status === 'ok'));
   } finally { cleanup(); }
 });
 
@@ -50,13 +52,16 @@ test('missing image credentials are a warning that explains the fallback', async
   try {
     const preflight = createPreflight({
       dataRoot: join(root, 'data'), runtimeHome: join(root, 'runtime'), version: '1',
-      resolveCredential: async () => null, execFileImpl: fakeExec(), exists: () => true
+      resolveCredential: async () => null, resolvePackage: () => null, execFileImpl: fakeExec(), exists: () => true
     });
     const result = await preflight.run();
     assert.equal(result.ok, true, '出图凭据缺失不阻塞其它功能');
     const warning = result.warnings.find(row => row.id === 'image-gen');
     assert.ok(warning, '要提示出图不可用');
     assert.match(warning.fix, /GD CLI|登录/);
+    const plugin = result.warnings.find(row => row.id === 'image-plugin');
+    assert.ok(plugin, '未安装 dsh-image-gen 要提示');
+    assert.match(plugin.fix, /dsh-image-gen/);
   } finally { cleanup(); }
 });
 

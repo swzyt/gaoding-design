@@ -11,7 +11,17 @@
  */
 import { execFile } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { join } from 'node:path';
+
+/** 从插件自身位置解析同级安装的插件包：profile 的 node_modules 里有就能找到。 */
+function defaultResolvePackage(name) {
+  try {
+    const require = createRequire(import.meta.url);
+    const file = require.resolve(name + '/package.json');
+    return JSON.parse(readFileSync(file, 'utf8'));
+  } catch { return null; }
+}
 
 const CACHE_MS = 30000;
 
@@ -37,7 +47,7 @@ function pythonBinary(runtimeHome, env = process.env) {
  * @param {Function} [options.execFileImpl] 便于测试注入
  * @param {Function} [options.exists] 便于测试注入
  */
-export function createPreflight({ dataRoot, runtimeHome, version, resolveCredential, execFileImpl = execFile, exists = existsSync, env = process.env }) {
+export function createPreflight({ dataRoot, runtimeHome, version, resolveCredential, resolvePackage = defaultResolvePackage, execFileImpl = execFile, exists = existsSync, env = process.env }) {
   let cached = null;
 
   async function collect() {
@@ -105,7 +115,17 @@ export function createPreflight({ dataRoot, runtimeHome, version, resolveCredent
       });
     }
 
-    // 5. 出图能力：决定「全自动」能不能真的自动
+    // 5. DSH 图像插件（dsh-image-gen）是否安装：出图界面和订阅登录都靠它
+    const imageGen = resolvePackage('dsh-image-gen');
+    checks.push(imageGen
+      ? { id: 'image-plugin', label: 'DSH 图像插件（dsh-image-gen）', status: 'ok', detail: '已安装 v' + (imageGen.version ?? '?') }
+      : {
+        id: 'image-plugin', label: 'DSH 图像插件（dsh-image-gen）', status: 'warn',
+        detail: '未安装',
+        fix: '在 Plugin Manager 安装 dsh-image-gen（用于订阅登录与出图）；不装就只能用 GD CLI（稿豆）。'
+      });
+
+    // 6. 出图能力：决定「全自动」能不能真的自动
     if (!resolveCredential) {
       checks.push({ id: 'image-gen', label: '出图能力（0 稿豆）', status: 'warn', detail: '未注入凭据服务', fix: '重启 DSH 或重新安装插件。' });
     } else {
@@ -124,7 +144,7 @@ export function createPreflight({ dataRoot, runtimeHome, version, resolveCredent
         });
     }
 
-    // 6. GD CLI（可选后端）：不同安装方式的可执行名不一样，逐个试。
+    // 7. GD CLI（可选后端）：不同安装方式的可执行名不一样，逐个试。
     let gd = { ok: false, stdout: '' };
     for (const name of ['gd', 'gaoding', 'gaoding-cli']) {
       gd = await runIn(execFileImpl, 'which', [name], 5000);
@@ -134,7 +154,7 @@ export function createPreflight({ dataRoot, runtimeHome, version, resolveCredent
       ? { id: 'gd-cli', label: 'GD CLI（可选后端）', status: 'ok', detail: gd.stdout }
       : { id: 'gd-cli', label: 'GD CLI（可选后端）', status: 'info', detail: '未安装；不影响默认路径', fix: '需要稿豆出图时再安装。' });
 
-    // 7. 插件版本（提醒刷新页面）
+    // 8. 插件版本（提醒刷新页面）
     checks.push({ id: 'plugin', label: '插件版本', status: 'ok', detail: version });
 
     const blocking = checks.filter(check => check.blocking && check.status === 'fail');

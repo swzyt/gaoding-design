@@ -44,6 +44,7 @@ node scripts/verify-package.mjs dist/dsh-plugin-gaoding-publisher-<version>.tgz
 | Python 运行时（含 Pillow） | **阻塞**：提示重装插件或 `pip install Pillow` |
 | ego-browser 浏览器工具 | **阻塞**：提示安装或设置 `EGO_BROWSER_BIN` |
 | 稿定浏览器登录态 | 提示：去「检查登录」 |
+| DSH 图像插件（dsh-image-gen） | 提示：到 Plugin Manager 安装，否则没有订阅登录与出图入口 |
 | 出图能力（订阅凭据） | 提示：登录订阅账号，或后端改 GD CLI（全自动会停在等待素材） |
 | GD CLI（可选） | 仅提示，不影响默认路径 |
 | 插件版本 | 显示当前版本，配合顶部「插件已更新，请刷新」横幅 |
