@@ -1098,6 +1098,7 @@ window.__ModuleLoader__.load({
           h('span', { style: { flex: 1 } }),
           h('button', { type: 'button', style: styles.button(false), disabled: busy === 'probe' || busy === 'login', onClick: probe }, busy === 'probe' ? '检查中…' : '检查登录'),
           session?.loggedIn === true ? null : h('button', { type: 'button', style: styles.button(false), disabled: busy === 'login', onClick: login }, busy === 'login' ? '打开中…' : '去登录'),
+          h('button', { type: 'button', style: styles.button(false), onClick: () => window.open('gaoding-publisher/docs/USAGE', '_blank', 'noopener') }, '使用教程'),
           h('button', { type: 'button', style: styles.button(false), disabled: busy === 'topics', onClick: () => loadTopics(true) }, busy === 'topics' ? '刷新中…' : '刷新话题')
         ),
         h('div', { style: { display: 'flex', gap: 6, padding: '10px 20px', borderBottom: '1px solid ' + color.line } },

@@ -25,7 +25,7 @@ test('host registration owns disposers',()=>{
  const registered=[];const disposers=[];const routes=[];let disposed=0;
  const ctx={effect(fn){disposers.push(fn());},tools:{register(tool){registered.push(tool.name);return ()=>registered.pop();}},webServer:{register(value){routes.push(value);return()=>{disposed++;};}},inject(_deps,fn){fn(ctx);}};
  apply(ctx);
- assert.deepEqual(routes.map(route=>route.path),['/gaoding-publisher/topics','/gaoding-publisher/specs','/gaoding-publisher/specs/refresh','/gaoding-publisher/session','/gaoding-publisher/session/probe','/gaoding-publisher/session/login','/gaoding-publisher/jobs','/gaoding-publisher/jobs/remove','/gaoding-publisher/pipeline/run','/gaoding-publisher/results','/gaoding-publisher/preview','/gaoding-publisher/prompts','/gaoding-publisher/prompts/confirm','/gaoding-publisher/prompts/generate','/gaoding-publisher/create/status','/gaoding-publisher/create/preview','/gaoding-publisher/create','/gaoding-publisher/published','/gaoding-publisher/health','/gaoding-publisher/publish/check','/gaoding-publisher/publish','/gaoding-publisher/publish/remove','/gaoding-publisher/publish/batch','/gaoding-publisher/publish/queue','/gaoding-publisher/publish/cancel','/gaoding-publisher/publish/run','/gaoding-publisher/publish/reconcile','/gaoding-publisher/publish/resolve-uncertain','/gaoding-publisher/publish/abandon','/gaoding-publisher/publish/republish','/gaoding-publisher/evidence/ai','/gaoding-publisher/image/test','/gaoding-publisher/preflight']);
+ assert.deepEqual(routes.map(route=>route.path),['/gaoding-publisher/topics','/gaoding-publisher/specs','/gaoding-publisher/specs/refresh','/gaoding-publisher/session','/gaoding-publisher/session/probe','/gaoding-publisher/session/login','/gaoding-publisher/jobs','/gaoding-publisher/jobs/remove','/gaoding-publisher/pipeline/run','/gaoding-publisher/results','/gaoding-publisher/preview','/gaoding-publisher/prompts','/gaoding-publisher/prompts/confirm','/gaoding-publisher/prompts/generate','/gaoding-publisher/create/status','/gaoding-publisher/create/preview','/gaoding-publisher/create','/gaoding-publisher/published','/gaoding-publisher/health','/gaoding-publisher/publish/check','/gaoding-publisher/publish','/gaoding-publisher/publish/remove','/gaoding-publisher/publish/batch','/gaoding-publisher/publish/queue','/gaoding-publisher/publish/cancel','/gaoding-publisher/publish/run','/gaoding-publisher/publish/reconcile','/gaoding-publisher/publish/resolve-uncertain','/gaoding-publisher/publish/abandon','/gaoding-publisher/publish/republish','/gaoding-publisher/evidence/ai','/gaoding-publisher/image/test','/gaoding-publisher/preflight','/gaoding-publisher/docs/USAGE']);
  assert.ok(routes.every(route=>route.kind==='exact'&&typeof route.handler==='function'));
  assert.equal(registered.length,5);disposers.reverse().forEach(fn=>fn());assert.equal(registered.length,0);assert.equal(disposed,routes.length);
 });
@@ -270,6 +270,13 @@ test('waiting for assets is shown as a waiting state, and failures are deduped',
   assert.match(client, /new Set\(job\.creation\.failed/, '失败原因要按内容去重');
   const index = readFileSync(new URL('./index.js', import.meta.url), 'utf8');
   assert.match(index, /waitingAssets \? 'waiting-assets'/, '等素材不应算「需要处理」');
+});
+
+test('the panel opens the bundled tutorial in a new window', async () => {
+  const { readFileSync } = await import('node:fs');
+  const client = readFileSync(new URL('./client.js', import.meta.url), 'utf8');
+  assert.match(client, /gaoding-publisher\/docs\/USAGE/, '面板要有教程入口');
+  assert.match(client, /使用教程/);
 });
 
 test('the panel checks dependencies on entry and disables actions when blocked', async () => {

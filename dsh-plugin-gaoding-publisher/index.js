@@ -11,6 +11,7 @@ import { ensureSpace } from './browser-space.js';
 import { layerFingerprint, preflightTemplateDeclaration, readDeclarationRecords, writeDeclarationPlan } from './template-declaration.js';
 import { createImageClient, fillAssetRequest } from './image-client.js';
 import { createPreflight } from './preflight.js';
+import { readUsage, renderUsagePage } from './usage-doc.js';
 import { generateUnitPrompt } from './prompt-writer.js';
 import { creatorStatus, createMaterialUnit, buildImageInput, defaultModel } from './creator.js';
 import { listPublished, summarize } from './published.js';
@@ -1100,6 +1101,19 @@ async function publishHandler(request, response) {
 /** 自检：确认插件能否用自己的凭据出图（不写任务目录，只验证链路）。 */
 
 /** 进入页面时的环境自检：依赖组件、登录态、出图能力逐项检查。 */
+
+/** 面板内打开使用教程：读 USAGE.md 渲染成独立页面。 */
+function usageDocHandler(request, response) {
+  if (request.method !== 'GET') return send(response, 405, { error: 'GET required' });
+  const doc = readUsage(pluginRoot);
+  if (!doc) {
+    response.writeHead(404, { 'content-type': 'text/html; charset=utf-8' });
+    return response.end('<h1>找不到使用教程</h1><p>安装包内缺少 USAGE.md。</p>');
+  }
+  response.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
+  return response.end(renderUsagePage({ title: '稿定投稿 · 使用教程', markdown: doc.text, version: pluginVersion() }));
+}
+
 async function preflightHandler(request, response) {
   if (request.method !== 'GET') return send(response, 405, { error: 'GET required' });
   try {
@@ -1267,7 +1281,8 @@ export function apply(ctx) {
       host.webServer.register({ kind: 'exact', path: '/gaoding-publisher/publish/republish', handler: publishRepublishHandler }),
       host.webServer.register({ kind: 'exact', path: '/gaoding-publisher/evidence/ai', handler: evidenceHandler }),
       host.webServer.register({ kind: 'exact', path: '/gaoding-publisher/image/test', handler: imageTestHandler }),
-      host.webServer.register({ kind: 'exact', path: '/gaoding-publisher/preflight', handler: preflightHandler })
+      host.webServer.register({ kind: 'exact', path: '/gaoding-publisher/preflight', handler: preflightHandler }),
+      host.webServer.register({ kind: 'exact', path: '/gaoding-publisher/docs/USAGE', handler: usageDocHandler })
     ];
     return () => { for (const dispose of disposers) { try { dispose?.(); } catch {} } };
   }));
