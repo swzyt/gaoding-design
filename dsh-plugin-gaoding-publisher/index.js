@@ -12,6 +12,7 @@ import { layerFingerprint, preflightTemplateDeclaration, readDeclarationRecords,
 import { createImageClient, fillAssetRequest } from './image-client.js';
 import { createPreflight } from './preflight.js';
 import { readUsage, renderMarkdown, renderUsagePage } from './usage-doc.js';
+import { buildDeleteRejectedScript, runDeleteScript } from './delete-rejected.js';
 import { generateUnitPrompt } from './prompt-writer.js';
 import { creatorStatus, createMaterialUnit, buildImageInput, defaultModel } from './creator.js';
 import { listPublished, summarize } from './published.js';
@@ -1154,6 +1155,20 @@ async function imageTestHandler(request, response) {
   }
 }
 
+
+/** 批量删除审核不通过的作品：默认 dryRun，只统计不动数据。 */
+async function deleteRejectedHandler(request, response) {
+  if (request.method !== 'POST') return send(response, 405, { error: 'POST required' });
+  try {
+    const body = await jsonBody(request);
+    const space = await currentSpace();
+    const dryRun = body.confirm !== true;
+    const script = buildDeleteRejectedScript({ space, limit: Number(body.limit) || 200, dryRun });
+    const result = await runDeleteScript(script);
+    return send(response, 200, { ...result, dryRun });
+  } catch (error) { return send(response, 400, { error: String(error?.message ?? error) }); }
+}
+
 async function publishQueueHandler(request, response) {
   try {
     if (request.method === 'GET') {
@@ -1292,7 +1307,8 @@ export function apply(ctx) {
       host.webServer.register({ kind: 'exact', path: '/gaoding-publisher/evidence/ai', handler: evidenceHandler }),
       host.webServer.register({ kind: 'exact', path: '/gaoding-publisher/image/test', handler: imageTestHandler }),
       host.webServer.register({ kind: 'exact', path: '/gaoding-publisher/preflight', handler: preflightHandler }),
-      host.webServer.register({ kind: 'exact', path: '/gaoding-publisher/docs/USAGE', handler: usageDocHandler })
+      host.webServer.register({ kind: 'exact', path: '/gaoding-publisher/docs/USAGE', handler: usageDocHandler }),
+      host.webServer.register({ kind: 'exact', path: '/gaoding-publisher/publish/delete-rejected', handler: deleteRejectedHandler })
     ];
     return () => { for (const dispose of disposers) { try { dispose?.(); } catch {} } };
   }));

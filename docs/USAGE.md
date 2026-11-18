@@ -175,6 +175,19 @@
 
 ---
 
+## 7.5 清理被拒作品
+
+素材被拒后可以先清掉再重做（面板「已投稿」页或用接口）：
+
+```bash
+# 只统计，不动数据
+curl -s -X POST http://127.0.0.1:<port>/gaoding-publisher/publish/delete-rejected -d '{}'
+# 真正删除（逐件确认，数量没减少立即停止）
+curl -s -X POST http://127.0.0.1:<port>/gaoding-publisher/publish/delete-rejected -d '{"confirm":true,"limit":200}'
+```
+
+删除只针对状态文案为「审核不通过」的卡片；已通过、审核中的不会动。删除后需要重做的稿子走「重新投稿」。
+
 ## 8. 故障速查
 
 | 现象 | 原因 | 处理 |

@@ -221,6 +221,19 @@ export async function createMaterialFromGenerated({ unit, canvas, python }) {
       } catch {}
     }
   }
+  // 元素类素材（平台要求「可独立使用」）：必须真透明底，并记录透明统计供投稿前检查。
+  const elementMode = unit?.brief?.assetMode !== 'scene';
+  let elementStats = null;
+  if (elementMode && python) {
+    const { alphaStats, normalizeAsset } = await import('./image-client.js');
+    if (!alphaRange || alphaRange.min > 16) {
+      try {
+        await normalizeAsset({ python, input: asset, output: asset, width: info?.w, height: info?.h, requireAlpha: true });
+        alphaRange = await pngAlphaRange(asset, python);
+      } catch {}
+    }
+    elementStats = await alphaStats({ python, file: asset }).catch(() => null);
+  }
   const hasTransparentPixels = alphaRange ? alphaRange.min <= 16 : false;
   const sha256 = createHash('sha256').update(readFileSync(asset)).digest('hex');
   const material = {

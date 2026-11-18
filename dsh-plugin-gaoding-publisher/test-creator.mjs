@@ -86,3 +86,12 @@ test('audit-sensitive words are stripped from negative prompts before sending', 
   assert.ok(!/国旗/.test(input.prompt));
   assert.deepEqual(input.negativeRemoved, ['国旗']);
 });
+
+test('element material records transparency stats and enforces real alpha', async () => {
+  const { readFileSync } = await import('node:fs');
+  const source = readFileSync(new URL('./creator.js', import.meta.url), 'utf8');
+  assert.match(source, /const elementMode = unit\?\.brief\?\.assetMode !== 'scene'/, '形态来自建任务时的 brief');
+  assert.match(source, /alphaStats\(\{ python, file: asset \}\)/, '元素素材要记录透明统计');
+  assert.match(source, /assetMode: elementMode \? 'element' : 'scene'/);
+  assert.match(source, /element: elementStats/);
+});
