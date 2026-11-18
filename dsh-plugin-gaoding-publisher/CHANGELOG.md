@@ -2,6 +2,12 @@
 
 只记录对使用者有意义的变化。版本号见 `package.json`。
 
+## 0.42.1（教程在面板内直接打开）
+
+- 修「点使用教程没反应」：不再用 `window.open`（应用内可能被拦），改成面板内弹层，
+  由 `GET /docs/USAGE?format=json` 取渲染好的 HTML 内嵌显示，弹层里另有「在新窗口打开」。
+- 仓库新增 [docs/README.md](../docs/README.md) 文档索引，教程同时存在于 `docs/USAGE.md` 与包内 `USAGE.md`。
+
 ## 0.42.0（教程可直达）
 
 - 面板右上角新增「使用教程」按钮，新窗口打开渲染好的教程（`GET /docs/USAGE`，自带样式、表格、代码块）。

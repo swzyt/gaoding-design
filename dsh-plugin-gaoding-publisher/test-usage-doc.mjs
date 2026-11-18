@@ -40,3 +40,14 @@ test('docs/USAGE.md and the packaged copy stay identical', () => {
   if (!existsSync(repoDoc)) return; // 独立安装场景下没有仓库 docs 目录
   assert.equal(readFileSync(packaged, 'utf8'), readFileSync(repoDoc, 'utf8'), '两处教程必须一致，改一处要同步另一处');
 });
+
+test('the usage route also serves JSON for in-panel rendering', async () => {
+  const { readFileSync } = await import('node:fs');
+  const index = readFileSync(new URL('./index.js', import.meta.url), 'utf8');
+  assert.match(index, /format.*json/, '要支持 ?format=json');
+  assert.match(index, /renderMarkdown\(doc\.text\)/, 'JSON 里给渲染好的 html');
+  const client = readFileSync(new URL('./client.js', import.meta.url), 'utf8');
+  assert.match(client, /dangerouslySetInnerHTML/, '面板要在弹层里渲染教程');
+  assert.match(client, /openUsage/, '要有打开教程的实现');
+  assert.doesNotMatch(client, /window\.open\('gaoding-publisher\/docs\/USAGE'/, '不再依赖可能被拦截的新窗口');
+});

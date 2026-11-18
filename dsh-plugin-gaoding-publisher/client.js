@@ -36,6 +36,7 @@ window.__ModuleLoader__.load({
       publishBatch: taskIds => request('publish/batch', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ taskIds, submit: true }) }),
       publishCancel: taskId => request('publish/cancel', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ taskId }) }),
       preflight: refresh => request('preflight' + (refresh ? '?refresh=1' : '')),
+      usageDoc: () => request('docs/USAGE?format=json'),
       publishQueue: () => request('publish/queue'),
       startQueue: taskIds => request('publish/queue', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ taskIds, submit: true }) }),
       stopQueue: () => request('publish/queue', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'stop' }) }),
@@ -79,11 +80,12 @@ window.__ModuleLoader__.load({
       throw Error('当前环境不支持自动复制，请手动选择指令文本')
     }
 
+    // 只用 DSH 主题里真实存在的令牌（Theme.listTokens），并保留十六进制兜底。
     const color = {
       line: 'var(--dsw-alias-border-l2, rgba(0,0,0,0.1))',
-      primary: 'var(--dsw-alias-state-business-primary, #2f6cf6)',
-      muted: 'var(--dsw-alias-label-tertiary, #6b7280)',
-      hover: 'var(--dsw-alias-interactive-bg-hover, rgba(47,108,246,0.06))'
+      primary: 'var(--dsw-alias-brand-primary, #2f6cf6)',
+      muted: 'var(--dsw-alias-label-secondary, #6b7280)',
+      hover: 'var(--dsw-alias-bg-layer-2, rgba(47,108,246,0.06))'
     }
     const styles = {
       page: { height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column', color: 'var(--dsw-alias-label-primary, inherit)' },
@@ -944,6 +946,7 @@ window.__ModuleLoader__.load({
     function ConsolePage() {
       const [preflight, setPreflight] = React.useState(null)
       const [preflightBusy, setPreflightBusy] = React.useState(false)
+      const [usage, setUsage] = React.useState(null)
       const [tab, setTab] = React.useState('topics')
       const [catalog, setCatalog] = React.useState(null)
       const [specs, setSpecs] = React.useState(null)
@@ -1077,6 +1080,11 @@ window.__ModuleLoader__.load({
         return () => clearInterval(timer)
       }, [specs?.job?.running])
 
+      async function openUsage() {
+        setUsage({ loading: true })
+        try { setUsage(await api.usageDoc()) } catch (error) { setUsage({ error: error.message }) }
+      }
+
       async function runPreflight(refresh) {
         setPreflightBusy(true)
         try { setPreflight(await api.preflight(refresh)) } catch (e) { setPreflight({ error: e.message }) } finally { setPreflightBusy(false) }
@@ -1098,7 +1106,7 @@ window.__ModuleLoader__.load({
           h('span', { style: { flex: 1 } }),
           h('button', { type: 'button', style: styles.button(false), disabled: busy === 'probe' || busy === 'login', onClick: probe }, busy === 'probe' ? '检查中…' : '检查登录'),
           session?.loggedIn === true ? null : h('button', { type: 'button', style: styles.button(false), disabled: busy === 'login', onClick: login }, busy === 'login' ? '打开中…' : '去登录'),
-          h('button', { type: 'button', style: styles.button(false), onClick: () => window.open('gaoding-publisher/docs/USAGE', '_blank', 'noopener') }, '使用教程'),
+          h('button', { type: 'button', style: styles.button(false), disabled: usage?.loading === true, onClick: openUsage }, usage?.loading ? '加载中…' : '使用教程'),
           h('button', { type: 'button', style: styles.button(false), disabled: busy === 'topics', onClick: () => loadTopics(true) }, busy === 'topics' ? '刷新中…' : '刷新话题')
         ),
         h('div', { style: { display: 'flex', gap: 6, padding: '10px 20px', borderBottom: '1px solid ' + color.line } },
@@ -1131,6 +1139,25 @@ window.__ModuleLoader__.load({
               '· ' + row.label + '：' + row.detail + (row.fix ? ' → ' + row.fix : '')))
           )
         })() : null,
+        usage ? h('div', {
+          style: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 90, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 },
+          onClick: event => { if (event.target === event.currentTarget) setUsage(null) }
+        },
+          h('div', { style: { background: 'var(--dsw-alias-bg-layer-1)', color: 'var(--dsw-alias-label-primary)', borderRadius: 12, width: 'min(920px, 96vw)', height: '86vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 64px rgba(0,0,0,0.28)' } },
+            h('div', { style: { display: 'flex', gap: 10, alignItems: 'center', padding: '12px 18px', borderBottom: '1px solid ' + color.line } },
+              h('strong', { style: { fontSize: 14 } }, usage.title || '稿定投稿 · 使用教程'),
+              h('span', { style: { fontSize: 11.5, color: color.muted } }, usage.version ? 'v' + usage.version : ''),
+              h('span', { style: { flex: 1 } }),
+              h('a', { href: 'gaoding-publisher/docs/USAGE', target: '_blank', rel: 'noreferrer', style: { fontSize: 12, color: color.primary } }, '在新窗口打开'),
+              h('button', { type: 'button', style: styles.button(false), onClick: () => setUsage(null) }, '关闭')
+            ),
+            usage.error
+              ? h('div', { style: { padding: 18, fontSize: 12.5, color: '#c0392b' } }, '教程加载失败：' + usage.error)
+              : usage.html
+                ? h('div', { style: { padding: '8px 22px 28px', overflow: 'auto', flex: 1, fontSize: 13.5, lineHeight: 1.75 }, dangerouslySetInnerHTML: { __html: usage.html } })
+                : h('div', { style: { padding: 18, fontSize: 12.5, color: color.muted } }, '加载中…')
+          )
+        ) : null,
         error ? h('p', { style: { margin: 0, padding: '8px 20px', fontSize: 12.5, color: '#c0392b', borderBottom: '1px solid ' + color.line } }, error) : null,
         tab === 'topics' ? h('div', { style: styles.body },
           h('div', { style: styles.left },

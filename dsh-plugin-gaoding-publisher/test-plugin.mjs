@@ -194,14 +194,22 @@ test('the console exposes every requested tab, filter and backend choice', async
 test('client panel uses only theme tokens that exist in DSH',()=>{
  const source=readFileSync(new URL('./client.js',import.meta.url),'utf8');
  const tokens=[...new Set(source.match(/--dsw-alias-[a-z0-9-]+/g)??[])];
+ // 来自 Client Theme Provider 的 listTokens 实际返回值，不要凭空添加。
  const known=new Set([
-  '--dsw-alias-bg-layer-3',
+  '--dsw-alias-bg-base',
+  '--dsw-alias-bg-layer-1',
+  '--dsw-alias-bg-layer-2',
+  '--dsw-alias-bg-overlay',
+  '--dsw-alias-border-l1',
   '--dsw-alias-border-l2',
-  '--dsw-alias-interactive-bg-hover',
+  '--dsw-alias-brand-primary',
   '--dsw-alias-label-primary',
-  '--dsw-alias-label-tertiary',
-  '--dsw-alias-state-business-primary',
-  '--dsw-alias-state-error-primary'
+  '--dsw-alias-label-secondary',
+  '--dsw-alias-state-error-primary',
+  '--dsw-alias-state-idle-primary',
+  '--dsw-alias-state-success-primary',
+  '--dsw-alias-state-warn-primary',
+  '--dsw-specific-sidebar-fill'
  ]);
  assert.deepEqual(tokens.filter((token)=>!known.has(token)),[],'client.js references a theme token this DSH version does not define');
 });
@@ -272,11 +280,12 @@ test('waiting for assets is shown as a waiting state, and failures are deduped',
   assert.match(index, /waitingAssets \? 'waiting-assets'/, '等素材不应算「需要处理」');
 });
 
-test('the panel opens the bundled tutorial in a new window', async () => {
+test('the panel opens the bundled tutorial inside the plugin panel', async () => {
   const { readFileSync } = await import('node:fs');
   const client = readFileSync(new URL('./client.js', import.meta.url), 'utf8');
-  assert.match(client, /gaoding-publisher\/docs\/USAGE/, '面板要有教程入口');
-  assert.match(client, /使用教程/);
+  assert.match(client, /使用教程/, '面板要有教程入口');
+  assert.match(client, /api\.usageDoc\(/, '通过接口取教程内容');
+  assert.match(client, /dangerouslySetInnerHTML/, '在弹层里渲染，不依赖新窗口');
 });
 
 test('the panel checks dependencies on entry and disables actions when blocked', async () => {

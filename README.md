@@ -30,7 +30,7 @@
 | `pipeline/workflow/agent_assets.py` | 非CLI素材交接、真实工具记录和哈希验证 |
 | `tooling/spec_to_psd.js` | 可编辑 PSD 输出 |
 | `dsh-plugin-gaoding-publisher/` | DSH 工具、选题界面、技能和包元数据 |
-| `scripts/`、`docs/` | 打包验证及发布说明 |
+| `scripts/`、`docs/` | 打包验证及发布说明；文档索引见 [docs/README.md](docs/README.md) |
 | `archive/` | 历史任务、旧说明、迁移记录与清理清单；不参与运行或分发 |
 | `dist/` | 生成的安装包与校验值 |
 

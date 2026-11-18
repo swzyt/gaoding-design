@@ -11,7 +11,7 @@ import { ensureSpace } from './browser-space.js';
 import { layerFingerprint, preflightTemplateDeclaration, readDeclarationRecords, writeDeclarationPlan } from './template-declaration.js';
 import { createImageClient, fillAssetRequest } from './image-client.js';
 import { createPreflight } from './preflight.js';
-import { readUsage, renderUsagePage } from './usage-doc.js';
+import { readUsage, renderMarkdown, renderUsagePage } from './usage-doc.js';
 import { generateUnitPrompt } from './prompt-writer.js';
 import { creatorStatus, createMaterialUnit, buildImageInput, defaultModel } from './creator.js';
 import { listPublished, summarize } from './published.js';
@@ -1109,6 +1109,16 @@ function usageDocHandler(request, response) {
   if (!doc) {
     response.writeHead(404, { 'content-type': 'text/html; charset=utf-8' });
     return response.end('<h1>找不到使用教程</h1><p>安装包内缺少 USAGE.md。</p>');
+  }
+  // ?format=json 给面板内嵌用（弹层里渲染），默认返回独立页面（可直接分享/新窗口打开）。
+  const wantsJson = new URL(request.url ?? '/', 'http://localhost').searchParams.get('format') === 'json';
+  if (wantsJson) {
+    return send(response, 200, {
+      title: '稿定投稿 · 使用教程',
+      version: pluginVersion(),
+      source: doc.file,
+      html: renderMarkdown(doc.text)
+    });
   }
   response.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
   return response.end(renderUsagePage({ title: '稿定投稿 · 使用教程', markdown: doc.text, version: pluginVersion() }));
