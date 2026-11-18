@@ -1,0 +1,245 @@
+{
+  "canvas": {
+    "w": 1080,
+    "h": 1440
+  },
+  "title": "原生排版开发演示",
+  "description": "本地开发预览，不用于投稿",
+  "topic": "offline-demo",
+  "layers": [
+    {
+      "id": "background",
+      "name": "background",
+      "type": "shape",
+      "box": [
+        0,
+        0,
+        1080,
+        1440
+      ],
+      "color": [
+        244,
+        240,
+        229,
+        255
+      ],
+      "ellipse": false,
+      "copyright_category": "original"
+    },
+    {
+      "id": "accent-disc",
+      "name": "accent-disc",
+      "type": "shape",
+      "box": [
+        612,
+        558,
+        366,
+        366
+      ],
+      "color": [
+        228,
+        102,
+        50,
+        255
+      ],
+      "ellipse": true,
+      "copyright_category": "original"
+    },
+    {
+      "id": "disc-cutout",
+      "name": "disc-cutout",
+      "type": "shape",
+      "box": [
+        676,
+        622,
+        238,
+        238
+      ],
+      "color": [
+        244,
+        240,
+        229,
+        255
+      ],
+      "ellipse": true,
+      "copyright_category": "original"
+    },
+    {
+      "id": "vertical-rule",
+      "name": "vertical-rule",
+      "type": "shape",
+      "box": [
+        76,
+        596,
+        2,
+        348
+      ],
+      "color": [
+        26,
+        45,
+        52,
+        255
+      ],
+      "ellipse": false,
+      "copyright_category": "original"
+    },
+    {
+      "id": "footer-rule",
+      "name": "footer-rule",
+      "type": "shape",
+      "box": [
+        76,
+        1167,
+        928,
+        2
+      ],
+      "color": [
+        26,
+        45,
+        52,
+        255
+      ],
+      "ellipse": false,
+      "copyright_category": "original"
+    },
+    {
+      "id": "issue",
+      "name": "issue",
+      "type": "text",
+      "text": "TYPE / SPACE / COLOR",
+      "box": [
+        76,
+        84,
+        900,
+        60
+      ],
+      "size": 26,
+      "color": [
+        26,
+        45,
+        52
+      ],
+      "font": "ArialUnicodeMS",
+      "preview_font": "Arial Unicode.ttf",
+      "gd_font": "思源黑体",
+      "letter_spacing": 3
+    },
+    {
+      "id": "headline",
+      "name": "headline",
+      "type": "text",
+      "text": "给文字\n留一点呼吸",
+      "box": [
+        68,
+        209,
+        940,
+        334
+      ],
+      "size": 112,
+      "color": [
+        26,
+        45,
+        52
+      ],
+      "font": "SongtiSC-Regular",
+      "preview_font": "Songti.ttc",
+      "gd_font": "思源宋体",
+      "line_height": 1.25
+    },
+    {
+      "id": "body",
+      "name": "body",
+      "type": "text",
+      "text": "共同对齐，让信息有秩序。\n适当留白，让重点被看见。\n让色彩服务于阅读。",
+      "box": [
+        108,
+        639,
+        530,
+        270
+      ],
+      "size": 30,
+      "color": [
+        26,
+        45,
+        52
+      ],
+      "font": "ArialUnicodeMS",
+      "preview_font": "Arial Unicode.ttf",
+      "gd_font": "思源黑体",
+      "line_height": 1.8
+    },
+    {
+      "id": "section",
+      "name": "section",
+      "type": "text",
+      "text": "版式与配色练习",
+      "box": [
+        76,
+        1007,
+        850,
+        68
+      ],
+      "size": 33,
+      "color": [
+        26,
+        45,
+        52
+      ],
+      "font": "ArialUnicodeMS",
+      "preview_font": "Arial Unicode.ttf",
+      "gd_font": "思源黑体",
+      "letter_spacing": 3
+    },
+    {
+      "id": "footer",
+      "name": "footer",
+      "type": "text",
+      "text": "本地原生排版演示  ·  未投稿",
+      "box": [
+        76,
+        1220,
+        900,
+        65
+      ],
+      "size": 24,
+      "color": [
+        26,
+        45,
+        52
+      ],
+      "font": "ArialUnicodeMS",
+      "preview_font": "Arial Unicode.ttf",
+      "gd_font": "思源黑体"
+    },
+    {
+      "id": "number",
+      "name": "number",
+      "type": "text",
+      "text": "01",
+      "box": [
+        76,
+        1304,
+        900,
+        60
+      ],
+      "size": 26,
+      "color": [
+        26,
+        45,
+        52
+      ],
+      "font": "ArialUnicodeMS",
+      "preview_font": "Arial Unicode.ttf",
+      "gd_font": "思源黑体",
+      "align": "right"
+    }
+  ],
+  "layer_audit": {
+    "pairs": [
+      {
+        "subject": "accent-disc",
+        "background": "background"
+      }
+    ]
+  }
+}

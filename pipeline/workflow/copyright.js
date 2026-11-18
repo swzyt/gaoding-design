@@ -1,6 +1,12 @@
 const fs=require('node:fs/promises'),path=require('node:path'),crypto=require('node:crypto');
 const read=async p=>JSON.parse(await fs.readFile(p,'utf8'));
 const write=async(p,x)=>fs.writeFile(p,JSON.stringify(x,null,2));
+// Only ownership claims need original proof; third-party materials retain identity/classification checks.
+function evidenceCategories(rows){
+ const categories=[...new Set(rows.map(r=>r.category))];
+ if(categories.some(c=>!['original','original_ai','non_original','gaoding'].includes(c)))throw Error('Unsupported copyright category');
+ return categories.filter(c=>c==='original'||c==='original_ai');
+}
 async function inspect(page){return page.evaluate(()=>{
  const d=[document,...[...document.querySelectorAll('iframe')].map(f=>f.contentDocument).filter(Boolean)].find(d=>d.querySelector('.ugc-copyright-section'));
  if(!d)return null;
@@ -23,15 +29,41 @@ async function resolve(page,out,rows){
  return rows.map(row=>({...row,verified_url:resolved.find(x=>x.id===row.id).url,candidate_id:resolved.find(x=>x.id===row.id).candidate_id}));
 }
 function validate(state,rows){
+ const needsEvidence=evidenceCategories(rows);
  if(!state)throw Error('Copyright panel missing; registration/binding is incomplete');
  if(state.uncategorized.images.length)throw Error('Uncategorized materials remain');
  for(const row of rows)if(!state[row.category].images.some(url=>url.includes('/'+row.asset_id+'/')||url===row.verified_url))throw Error('Missing or misclassified asset '+row.id);
- for(const category of new Set(rows.map(r=>r.category)))if(!state[category].evidence.length)throw Error('Missing evidence for '+category);
+ for(const category of needsEvidence)if(!state[category].evidence.length)throw Error('Missing evidence for '+category);
  const actual=Object.values(state).reduce((n,s)=>n+s.images.length,0);if(actual!==rows.length)throw Error('Unexpected copyright candidate count '+actual+'/'+rows.length);
  return true;
 }
+async function evidenceFiles(recipePath,rows){
+ const needsEvidence=evidenceCategories(rows);
+ if(!needsEvidence.length)return {};
+ const root=path.dirname(recipePath),recipe=await read(recipePath),out=path.join(root,recipe.output||'release');
+ const file=path.join(root,'copyright-evidence.json'),raw=await fs.readFile(file),manifest=JSON.parse(raw);
+ const review=await read(path.join(out,'material-review.json'));
+ if(review.evidence_sha256!==crypto.createHash('sha256').update(raw).digest('hex'))throw Error('Real copyright evidence needs current Agent material review');
+ const files={};
+ for(const category of needsEvidence){
+  const entries=manifest.categories?.[category];if(!Array.isArray(entries)||!entries.length)throw Error('Missing original evidence screenshots for '+category);
+  const expected=rows.filter(r=>r.category===category).map(r=>r.id),covered=new Set();files[category]=[];
+  for(const entry of entries){
+   if(typeof entry.path!=='string'||path.isAbsolute(entry.path))throw Error('Evidence path must be concept-relative');
+   const target=await fs.realpath(path.resolve(root,entry.path)),base=await fs.realpath(root);
+   if(!target.startsWith(base+path.sep)||['receipts.png','shape-evidence.png'].includes(path.basename(target)))throw Error('Use actual original evidence, not a generated provenance index');
+   if(!/\.(png|jpe?g|webp)$/i.test(target))throw Error('Copyright upload needs real image evidence');
+   const bytes=await fs.readFile(target);if(entry.sha256!==crypto.createHash('sha256').update(bytes).digest('hex'))throw Error('Evidence screenshot changed');
+   if(!Array.isArray(entry.layers)||entry.layers.some(id=>!expected.includes(id)))throw Error('Evidence must identify the actual layers it covers');
+   for(const id of entry.layers)covered.add(id);files[category].push(target);
+  }
+  if(expected.some(id=>!covered.has(id)))throw Error('Some image layers lack real copyright evidence');
+ }
+ return files;
+}
 async function prepare(page,recipePath){
  const recipe=await read(recipePath),out=path.join(path.dirname(recipePath),recipe.output||'release'),rows=await resolve(page,out,await read(path.join(out,'registered-assets.json')));
+ const evidence=await evidenceFiles(recipePath,rows);
  const before=await inspect(page);if(!before)throw Error('Open the copyright panel first');
  const actual=Object.values(before).reduce((n,s)=>n+s.images.length,0);if(actual!==rows.length)throw Error('Incomplete copyright extraction '+actual+'/'+rows.length);
  for(const row of rows){
@@ -43,9 +75,9 @@ async function prepare(page,recipePath){
    for(const [e,t] of [[th,'dragstart'],[zone,'dragenter'],[zone,'dragover'],[zone,'drop'],[th,'dragend']])e.dispatchEvent(new w.DragEvent(t,{bubbles:true,cancelable:true,dataTransfer:dt}));
   },row);
  }
- for(const c of new Set(rows.map(r=>r.category))){
+ for(const c of Object.keys(evidence)){
   const current=await inspect(page);if(current[c].evidence.length)continue;
-  await page.setInputFiles('.ugc-copyright-section-'+c+' input[type="file"]',[path.join(out,c==='original_ai'?'receipts.png':'shape-evidence.png')]);
+  await page.setInputFiles('.ugc-copyright-section-'+c+' input[type="file"]',evidence[c]);
   await page.waitForFunction(c=>{const d=[document,...[...document.querySelectorAll('iframe')].map(f=>f.contentDocument).filter(Boolean)].find(d=>d.querySelector('.ugc-copyright-section'));return !!d?.querySelector('.ugc-copyright-section-'+c+' .ugc-copyright-evidence-thumb img')},c,{timeout:30000});
  }
  const state=await inspect(page);validate(state,rows);await write(path.join(out,'copyright-prepared.json'),state);await page.screenshot({path:path.join(out,'copyright-prepared-v2.png')});return state;
@@ -73,7 +105,7 @@ async function verify(page,recipePath){
  const result={state:'verified',verifiedAt:new Date().toISOString(),expected:rows.length,uncategorized:0,original:panel.original.images.length,original_ai:panel.original_ai.images.length,originalEvidence:panel.original.evidence,aiEvidence:panel.original_ai.evidence,assets:rows.map(r=>({id:r.id,asset_id:r.asset_id,category:r.category,published_url:r.verified_url,content_sha256:r.sha256,candidate_id:r.candidate_id})),reopened:true};
  await page.screenshot({path:path.join(out,'copyright-verified-v2.png')});await write(path.join(out,'copyright-verification.json'),result);return result;
 }
-module.exports={inspect,resolve,validate,prepare,submit,verify};
+module.exports={inspect,resolve,validate,prepare,submit,verify,evidenceFiles};
 
 // Live entry verified 2026-11-06: 我的 → 发布 → 卡片右下角「…」，菜单第四项是「版权认证」（不是「版权说明」）；
 // 点开即「版权声明」弹窗，含 未分类/稿定/原创/原创AI/非原创 五个 .ugc-copyright-section-* 分区。

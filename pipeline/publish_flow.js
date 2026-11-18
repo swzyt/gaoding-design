@@ -5,13 +5,37 @@
  *   await flow.run({ space: 6, topicKey: 'birthday', psd: '/abs/path/birthday.psd',
  *                    title: '韩系拼贴风 生日海报 小红书封面',
  *                    desc: '……（不含话题标签）',
- *                    topic: '偶像生日应援局',
+ *                    topic: '偶像生日应援局', containsAI: true, copyrightCategory: 'original_ai',
  *                    fonts: [['文案-主标题','思源黑体 Heavy'], ...],
  *                    evidence: ['/abs/tl.png','/abs/dt.png','/abs/cd.png'] });
  */
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
+// Ordinary long-running topics do not imply activity enrollment. Missing kind
+// retains the legacy activity route; provenance is explicit on every material.
+function publicationPolicy(recipe) {
+  const topicKind = recipe.topic_kind ?? 'activity';
+  if (!['topic', 'activity'].includes(topicKind)) throw Error('topic_kind must be topic or activity');
+  if (!Array.isArray(recipe.layers)) {
+    if (typeof recipe.containsAI !== 'boolean') throw Error('Publication policy requires recipe.layers provenance or explicit containsAI for legacy callers');
+    return {topicKind, containsAI: recipe.containsAI, categories: null};
+  }
+  const categories = new Set();
+  for (const layer of recipe.layers) {
+    if (layer.type === 'text') continue;
+    if (!['image', 'shape'].includes(layer.type)) throw Error('Unsupported material type: ' + layer.type);
+    if (!['original', 'original_ai', 'non_original', 'gaoding'].includes(layer.copyright_category)) throw Error('Missing/unsupported material provenance: ' + (layer.name || layer.id));
+    categories.add(layer.copyright_category);
+  }
+  return {topicKind, containsAI: categories.has('original_ai'), categories: [...categories].sort()};
+}
+
 async function run(opts) {
+  const policy = publicationPolicy(opts.recipe || opts); // Fail ambiguous disclosure before navigating/importing.
+  const copyrightCategory = policy.categories?.length === 1 ? policy.categories[0] : opts.copyrightCategory;
+  if (opts.evidence?.length) {
+    if (!['original','original_ai'].includes(copyrightCategory) || (policy.categories && policy.categories.length !== 1) || (copyrightCategory === 'original_ai') !== policy.containsAI) throw Error('Legacy copyright needs one explicit source category; use the workflow for mixed materials');
+  }
   const T = await taskSpace(opts.space);
   const log = (...a) => console.log('[flow]', ...a);
   const page = opts.page || T.page("p1");
@@ -34,7 +58,7 @@ async function run(opts) {
       [...document.querySelectorAll('iframe[id^="buy-buy-application-modal"]')].some(
         frame => frame.contentDocument?.querySelector('.ugc-copyright-section')));
     if (!inline) await openCopyrightFromManagement(page, opts.desc);
-    if (!(await copyright(page, log, opts.evidence))) {
+    if (!(await copyright(page, log, opts.evidence, copyrightCategory))) {
       throw new Error('Published, but copyright submission was not confirmed');
     }
   }
@@ -103,43 +127,24 @@ async function selectLayer(page, name) {
 }
 
 async function applyFonts(page, log, fonts) {
-  for (const [layer, fontName] of fonts) {
-    if (!(await selectLayer(page, layer))) { log('layer missing', layer); continue; }
-    let opened = false;
-    for (const [x, y] of [[1360, 175], [1400, 175], [1320, 175], [1476, 130]]) {
-      await page.mouse.click(x, y); await page.waitForTimeout(900);
-      opened = await page.evaluate(() => !!document.querySelector('input[placeholder="搜索字体"]'));
-      if (opened) break;
-    }
-    if (!opened) { log('font panel not opened for', layer); continue; }
-    const si = await page.evaluate(() => { const el = document.querySelector('input[placeholder="搜索字体"]'); const b = el.getBoundingClientRect(); el.focus(); return {x: b.x+b.width/2, y: b.y+b.height/2}; });
-    await page.mouse.click(si.x, si.y); await page.waitForTimeout(150);
-    const base = fontName.split(' ')[0];
-    await page.keyboard.press('ControlOrMeta+a'); await page.keyboard.type(base); await page.waitForTimeout(1200);
-    // poll options
-    let opts = [];
-    for (let i = 0; i < 15; i++) {
-      opts = await page.evaluate(() => [...document.querySelectorAll('.dbu-font-panel__list__item__text')].map(e => {
-        const b = e.getBoundingClientRect(); return {t: (e.innerText || '').trim(), x: Math.round(b.x+b.width/2), y: Math.round(b.y+b.height/2)};
-      }));
-      if (opts.length) break;
-      await page.waitForTimeout(250);
-    }
-    const weight = fontName.replace(base, '').trim();
-    const alt = weight === '特粗' ? ['特粗','Heavy','粗体'] : weight === 'Heavy' ? ['Heavy','特粗'] : [weight].filter(Boolean);
-    let pick = opts.find(o => o.t === fontName) || opts.find(o => o.t === base + ' ' + weight);
-    if (!pick) for (const w of alt) { pick = opts.find(o => o.t.includes(w)); if (pick) break; }
-    if (!pick) pick = opts[0];
-    if (!pick) { log('no options for', fontName); continue; }
-    await page.mouse.click(pick.x, pick.y); await page.waitForTimeout(1200);
-    await page.evaluate(() => { const b = document.querySelector('.dui-panel-title-block__back-icon__button'); if (b) b.click(); });
-    await page.waitForTimeout(500);
-    await page.keyboard.press('Escape'); await page.waitForTimeout(300);
-    log('font ok', layer, '->', pick.t);
-  }
+  return require('./workflow/fonts.js').apply(page, fonts, rows => {
+    for (const row of rows.slice(-1)) log('font ok', row.layer, '->', row.font);
+  });
 }
 
+async function openPublicationDialog(page) {
+  return page.evaluate(()=>{
+    const frames=[...new Set(document.querySelectorAll('iframe[id^="buy-buy-application-modal"]'))].filter(f=>{const r=f.getBoundingClientRect();return r.width>0&&r.height>0;});
+    if(!frames.length)return null;
+    if(frames.length!==1)throw Error('Ambiguous visible publication dialogs');
+    const doc=frames[0].contentDocument;
+    if(doc?.querySelector('[contenteditable="true"]')&&doc.querySelector('button[aria-label="含AI生成内容"][role="switch"]'))return 'form';
+    if(doc?.querySelector('.ugc-copyright-section'))return 'copyright';
+    throw Error('Unknown visible publication dialog; inspect before retrying');
+  });
+}
 async function publishForm(page, log, opts) {
+  if(await openPublicationDialog(page))return true;
   const visible=await page.evaluate(()=>{const e=document.querySelector('.dub-publish-scope-panel');return e&&e.getBoundingClientRect().width>0});
   if(!visible)await page.click('.dub-publish-button');
   await page.waitForFunction(()=>document.querySelector('.dub-publish-scope-panel')?.getBoundingClientRect().width>0||[...document.querySelectorAll('iframe')].some(f=>f.contentDocument?.querySelector('.ugc-copyright-section')||f.contentDocument?.querySelector('[contenteditable="true"]')),undefined,{timeout:30000});
@@ -157,10 +162,110 @@ async function inIframe(page, fn, ...args) {
   return page.evaluate(fn, ...args);
 }
 
+// Read the observed iframe form; return viewport coordinates for native input.
+// No DOM click() is used here: it did not reliably trigger the editor's handlers.
+async function formAction(page,action,values={}) {
+  return page.evaluate(({action,values})=>{
+    const frames=[...document.querySelectorAll('iframe[id^="buy-buy-application-modal"]')].filter(f=>{
+      const r=f.getBoundingClientRect();return r.width>0&&r.height>0&&f.contentDocument?.querySelector('[contenteditable="true"]');
+    });
+    if(frames.length!==1)throw Error('Expected one visible publication form, found '+frames.length);
+    const frame=frames[0],doc=frame.contentDocument,ce=doc.querySelector('[contenteditable="true"]');
+    const point=el=>{if(!el||el.disabled)throw Error('Publication control is unavailable');const r=el.getBoundingClientRect(),f=frame.getBoundingClientRect();if(!r.width||!r.height)throw Error('Publication control is hidden');return {x:f.x+r.x+r.width/2,y:f.y+r.y+r.height/2};};
+    if(action==='state'){
+      const chips=[...ce.querySelectorAll('[data-topic-id]')].map(el=>({id:el.getAttribute('data-topic-id'),text:el.textContent.trim(),editable:el.getAttribute('contenteditable')}));
+      const toggle=doc.querySelector('button[aria-label="含AI生成内容"][role="switch"]');
+      return {chips,description:ce.textContent,ai:toggle?.getAttribute('aria-checked'),activity:[...doc.querySelectorAll('[role="button"], button')].some(el=>el.innerText.includes(values.topic)&&el.innerText.includes('已参与活动'))};
+    }
+    if(action==='topic-button'){
+      const buttons=[...doc.querySelectorAll('button')].filter(el=>el.innerText.trim()==='话题');
+      if(buttons.length!==1)throw Error('Expected one ordinary topic button, found '+buttons.length);
+      return point(buttons[0]);
+    }
+    if(action==='candidate'||action==='candidate-status'){
+      // Count distinct visible buttons, never the wrapper/title spans they contain.
+      const candidates=[...new Set(doc.querySelectorAll('button[data-topic-candidate-id]'))].filter(el=>{const r=el.getBoundingClientRect();return r.width>0&&r.height>0;});
+      const exact=candidates.filter(el=>[...el.querySelectorAll('span')].some(span=>span.children.length===0&&span.textContent.trim()===values.topic));
+      if(action==='candidate-status')return {count:candidates.length,exact:exact.length};
+      if(exact.length!==1)throw Error('Expected one exact topic candidate, found '+exact.length+' among '+candidates.length);
+      const id=exact[0].getAttribute('data-topic-candidate-id');
+      if(!id?.trim())throw Error('Topic candidate lacks a real ID');
+      return {...point(exact[0]),id};
+    }
+    if(action==='switch'){
+      const switches=[...doc.querySelectorAll('button[aria-label="含AI生成内容"][role="switch"]')];
+      if(switches.length!==1||!['true','false'].includes(switches[0].getAttribute('aria-checked')))throw Error('AI disclosure switch is missing or ambiguous');
+      return {...point(switches[0]),checked:switches[0].getAttribute('aria-checked')};
+    }
+    if(action==='description-end'){
+      ce.focus();const selection=frame.contentWindow.getSelection(),range=doc.createRange();
+      range.selectNodeContents(ce);range.collapse(false);selection.removeAllRanges();selection.addRange(range);
+      return true;
+    }
+    throw Error('Unknown publication form action: '+action);
+  },{action,values});
+}
+
+async function chooseOrdinaryTopic(page,topic) {
+  if(typeof topic!=='string'||!topic.trim())throw Error('Ordinary publication requires an exact topic name');
+  const state=await formAction(page,'state',{topic});
+  if(state.chips.length){
+    if(state.chips.length!==1||state.chips[0].text!==topic||!state.chips[0].id||state.chips[0].editable!=='false')throw Error('Existing topic chip does not match the requested topic');
+    return state.chips[0].id;
+  }
+  const pending=await formAction(page,'candidate-status',{topic});
+  if(pending.count&&pending.exact!==1)throw Error('Ambiguous or unknown existing topic search candidates');
+  if(!pending.count&&!state.description.includes('#'+topic)){
+    if(state.description.includes('#'))throw Error('Unknown existing topic search text; inspect before retrying');
+    const button=await formAction(page,'topic-button');await page.mouse.click(button.x,button.y);
+    await page.waitForFunction(()=>{
+      const frame=[...document.querySelectorAll('iframe[id^="buy-buy-application-modal"]')].filter(f=>f.getBoundingClientRect().width>0&&f.contentDocument?.querySelector('[contenteditable="true"]')).pop();
+      const doc=frame?.contentDocument,ce=doc?.querySelector('[contenteditable="true"][role="textbox"][aria-label="描述"]');
+      return ce&&doc.activeElement===ce&&ce.textContent.includes('#');
+    },undefined,{timeout:15000});
+    await page.keyboard.type(topic);
+  }
+  if(!pending.count)await page.waitForFunction(topic=>{
+    const frame=[...document.querySelectorAll('iframe[id^="buy-buy-application-modal"]')].filter(f=>f.getBoundingClientRect().width>0&&f.contentDocument?.querySelector('[contenteditable="true"]')).pop();
+    const candidates=[...new Set(frame?.contentDocument?.querySelectorAll('button[data-topic-candidate-id]')||[])].filter(el=>{const r=el.getBoundingClientRect();return r.width>0&&r.height>0;});
+    const exact=candidates.filter(el=>[...el.querySelectorAll('span')].some(span=>span.children.length===0&&span.textContent.trim()===topic));
+    if(exact.length>1)throw Error('Ambiguous exact topic search candidates');
+    return exact.length===1;
+  },topic,{timeout:15000});
+  const candidate=await formAction(page,'candidate',{topic});await page.mouse.click(candidate.x,candidate.y);
+  await page.waitForFunction(({topic,id})=>{
+    const frame=[...document.querySelectorAll('iframe[id^="buy-buy-application-modal"]')].filter(f=>f.getBoundingClientRect().width>0&&f.contentDocument?.querySelector('[contenteditable="true"]')).pop();
+    const chips=[...(frame?.contentDocument?.querySelectorAll('[contenteditable="true"] [data-topic-id]')||[])];
+    return chips.length===1&&chips[0].getAttribute('data-topic-id')===id&&chips[0].getAttribute('contenteditable')==='false'&&chips[0].textContent.trim()===topic;
+  },{topic,id:candidate.id},{timeout:15000});
+  return candidate.id;
+}
+
+async function setAIDisclosure(page,containsAI) {
+  if(typeof containsAI!=='boolean')throw Error('AI disclosure must be an explicit boolean');
+  const target=await formAction(page,'switch');
+  if(target.checked!==String(containsAI))await page.mouse.click(target.x,target.y);
+  await page.waitForFunction(expected=>{
+    const frames=[...document.querySelectorAll('iframe[id^="buy-buy-application-modal"]')].filter(f=>f.getBoundingClientRect().width>0&&f.contentDocument?.querySelector('[contenteditable="true"]'));
+    if(frames.length!==1)return false;
+    return frames[0].contentDocument.querySelector('button[aria-label="含AI生成内容"][role="switch"]')?.getAttribute('aria-checked')===String(expected);
+  },containsAI,{timeout:15000});
+}
+
+async function requirePublicationForm(page,topic,policy) {
+  const state=await formAction(page,'state',{topic});
+  if(state.chips.length!==1||!state.chips[0].id||state.chips[0].text!==topic||state.ai!==String(policy.containsAI)||(policy.topicKind==='topic'&&state.chips[0].editable!=='false')||(policy.topicKind==='activity'&&!state.activity))throw Error('Publication form topic/activity/AI disclosure does not match the recipe policy');
+  return state;
+}
+
 async function publish(page, log, opts) {
-  // rename
-  const fi = await page.evaluate(() => { const el = document.querySelector('input[placeholder="请输入文件名"]'); if (!el) return null; const b = el.getBoundingClientRect(); return {x: b.x+b.width/2, y: b.y+b.height/2}; });
-  if (fi) {
+  const policy = publicationPolicy(opts.recipe || opts);
+  // An existing iframe blocks the editor header. Resume it rather than
+  // clicking through its backdrop or inserting another topic search token.
+  const openDialog=await openPublicationDialog(page);
+  const fi = await page.evaluate(() => { const el = document.querySelector('input[placeholder="请输入文件名"]'); if (!el) return null; const b = el.getBoundingClientRect(); return {value:el.value,x: b.x+b.width/2, y: b.y+b.height/2}; });
+  if(openDialog&&fi&&fi.value!==opts.title)throw Error('Existing publication dialog has a different filename; inspect before retrying');
+  if (fi && fi.value!==opts.title && !openDialog) {
     await page.mouse.click(fi.x, fi.y); await page.waitForTimeout(300);
     await page.keyboard.press('ControlOrMeta+a'); await page.keyboard.type(opts.title); await page.keyboard.press('Enter');
     await page.waitForTimeout(1800);
@@ -172,7 +277,10 @@ async function publish(page, log, opts) {
     if(!opts.prepareCopyright)throw Error('Classify registered materials and attach evidence before continuing');
     await opts.prepareCopyright();
   }
-  // wait for dialog content, then click topic title (adds topicsIds chip)
+  if (policy.topicKind === 'topic') {
+    await chooseOrdinaryTopic(page,opts.topic);
+  } else {
+  // Legacy activity route remains separate from ordinary topic selection.
   let t = null;
   for (let i = 0; i < 20; i++) {
     t = await page.evaluate((name) => {
@@ -206,31 +314,15 @@ async function publish(page, log, opts) {
     return false;
   }, opts.topic);
   if (!activity) throw new Error('Activity is unavailable: ' + opts.topic);
-  // description append
-  await page.evaluate((desc) => {
-    const ifr = [...document.querySelectorAll('iframe[id^="buy-buy-application-modal"]')].pop();
-    const doc = ifr && ifr.contentDocument; if (!doc) return;
-    const ce = doc.querySelector('[contenteditable="true"]'); if (!ce) return;
-    ce.focus(); const sel = ifr.contentWindow.getSelection(); const range = doc.createRange();
-    range.selectNodeContents(ce); range.collapse(false); sel.removeAllRanges(); sel.addRange(range);
-    doc.execCommand('insertText', false, ' ' + desc);
-  }, opts.desc);
-  await page.waitForTimeout(800);
-  await page.evaluate(() => {
-    const frame = [...document.querySelectorAll('iframe[id^="buy-buy-application-modal"]')].pop();
-    const toggle = frame?.contentDocument?.querySelector('[role="switch"][aria-label="含AI生成内容"]');
-    if (toggle?.getAttribute('aria-checked') === 'false') toggle.click();
-  });
-  const valid = await page.evaluate((topic) => {
-    const frame = [...document.querySelectorAll('iframe[id^="buy-buy-application-modal"]')].pop();
-    const doc = frame?.contentDocument;
-    const chips = [...doc.querySelectorAll('[contenteditable="true"] [data-topic-id]')];
-    const title = [...doc.querySelectorAll('[role="button"], button')].find(e =>
-      e.innerText.includes(topic) && e.innerText.includes('已参与活动'));
-    return chips.length === 1 && chips[0].textContent.startsWith(topic) && !!title &&
-      doc.querySelector('[aria-label="含AI生成内容"]')?.getAttribute('aria-checked') === 'true';
-  }, opts.topic);
-  if (!valid) throw new Error('Check the topic chip, activity selection and AI disclosure before publishing');
+  }
+  if (typeof opts.desc !== 'string') throw Error('Publication description must be a string');
+  if (opts.desc && !(await formAction(page,'state',{topic:opts.topic})).description.includes(opts.desc)) {
+    await formAction(page,'description-end');
+    await page.keyboard.type(' ' + opts.desc);
+    await page.waitForFunction(desc=>[...document.querySelectorAll('iframe[id^="buy-buy-application-modal"]')].some(f=>f.contentDocument?.querySelector('[contenteditable="true"]')?.textContent.includes(desc)),opts.desc,{timeout:15000});
+  }
+  await setAIDisclosure(page,policy.containsAI);
+  await requirePublicationForm(page,opts.topic,policy);
   if (opts.prepareOnly) return true;
   await page.evaluate(() => {
     const frame = [...document.querySelectorAll('iframe[id^="buy-buy-application-modal"]')].pop();
@@ -279,13 +371,15 @@ async function openCopyrightFromManagement(page, description) {
   await page.waitForSelector('.ugc-copyright-section');
 }
 
-async function copyright(page, log, evidence) {
+async function copyright(page, log, evidence, category) {
+  if (!['original','original_ai'].includes(category)) throw Error('Legacy copyright requires an explicit material source category');
   const has = await page.evaluate(() => {
     const ifr = [...document.querySelectorAll('iframe[id^="buy-buy-application-modal"]')].pop();
     const doc = ifr?.contentDocument || document; return !!(doc && doc.querySelector('.ugc-copyright-section'));
   });
   if (!has) { log('copyright dialog not open'); return; }
-  // classify all uncategorized -> original_ai
+  // This legacy helper handles one proven source category only. Mixed-source
+  // works use workflow/copyright.js, which resolves candidates individually.
   for (let i = 0; i < 30; i++) {
     const n = await page.evaluate(() => {
       const ifr = [...document.querySelectorAll('iframe[id^="buy-buy-application-modal"]')].pop();
@@ -293,29 +387,29 @@ async function copyright(page, log, evidence) {
       return doc.querySelectorAll('.ugc-copyright-section-uncategorized .ugc-copyright-thumb').length;
     });
     if (n === 0) break;
-    await page.evaluate(() => {
+    await page.evaluate(category => {
       const ifr = [...document.querySelectorAll('iframe[id^="buy-buy-application-modal"]')].pop();
       const doc = ifr?.contentDocument || document, w = ifr?.contentWindow || window;
       const from = doc.querySelector('.ugc-copyright-section-uncategorized');
-      const to = doc.querySelector('.ugc-copyright-section-original_ai');
+      const to = doc.querySelector('.ugc-copyright-section-'+category);
       const th = from && from.querySelector('.ugc-copyright-thumb');
       const zone = to && to.querySelector('.ugc-copyright-grid-content');
       if (!th || !zone) return;
       const dt = new w.DataTransfer();
       const fire = (el, t) => el.dispatchEvent(new w.DragEvent(t, {bubbles: true, cancelable: true, dataTransfer: dt}));
       fire(th, 'dragstart'); fire(zone, 'dragenter'); fire(zone, 'dragover'); fire(zone, 'drop'); fire(th, 'dragend');
-    });
+    }, category);
     await page.waitForTimeout(700);
   }
   // evidence upload
-  const b = await page.evaluate(() => {
+  const b = await page.evaluate(category => {
     const ifr = [...document.querySelectorAll('iframe[id^="buy-buy-application-modal"]')].pop();
     const doc = ifr?.contentDocument || document; if (!doc) return null;
-    const sec = doc.querySelector('.ugc-copyright-section-original_ai');
+    const sec = doc.querySelector('.ugc-copyright-section-'+category);
     const el = sec && [...sec.querySelectorAll('*')].find(e => e.children.length === 0 && (e.innerText || '').trim().includes('声明材料'));
     if (!el) return null; const r = el.getBoundingClientRect();
     return {x: Math.round(r.x+r.width/2), y: Math.round(r.y+r.height/2)};
-  });
+  }, category);
   if (b && evidence.length) {
     const cp = page.waitForFileChooser({ timeout: 12000 });
     await page.mouse.click(b.x, b.y); const ch = await cp; await ch.setFiles(evidence);
@@ -346,4 +440,4 @@ async function copyright(page, log, evidence) {
   return !!sb && closed;
 }
 
-module.exports = { run, applyFonts, importPsd, publish, publishForm, copyright };
+module.exports = { run, applyFonts, importPsd, publish, publishForm, copyright, publicationPolicy, chooseOrdinaryTopic, setAIDisclosure, requirePublicationForm };

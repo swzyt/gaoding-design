@@ -22,7 +22,8 @@ try{
  process.env.GAODING_DATA_DIR=join(temp,'user data');delete process.env.GAODING_WORKSPACE;delete process.env.GAODING_RUNTIME_HOME;
  const host=await import(pathToFileURL(join(pkg,'runtime-host.js')).href);assert.equal(host.workspace,runtime);
  const plugin=await import(pathToFileURL(join(pkg,'index.js')).href);
- const info=await plugin.tools[0].execute();assert.ok(info.workflowGuide.startsWith(runtime));assert.equal(info.topics.length,5);
+ // Isolated synthetic catalog fixture: verification must never start a browser or read an account.
+ const info=await plugin.tools[0].execute({snapshot:{source:'https://creator.huaban.com/inspiration',checkedAt:new Date().toISOString(),complete:true,payload:{total:1,topics:[{id:'offline-fixture',name:'Offline verification fixture',url:'https://www.gaoding.com/topics/offline-fixture'}]}}});assert.ok(info.workflowGuide.startsWith(runtime));assert.equal(info.topics.length,1);assert.equal(info.status,'complete');
  // Resolve all CommonJS modules through the packed package's own scope.
  for(const file of ['publish.js','copyright.js','layer_audit.js','bind_assets.js'])await import(pathToFileURL(join(runtime,'pipeline/workflow',file)).href);
  const env=host.environment;
@@ -37,4 +38,4 @@ try{
  const result={package:archive,files:entries.length,runtimeFiles:Object.keys(manifest.files).length,checks:['packed hashes','no historical media or machine paths','isolated runtime discovery','CommonJS module imports','fresh writable dependency bootstrap','doctor and CLI help','background command completion','read-only package directory respected'],passed:true};
  console.log(JSON.stringify(result,null,2));
  writeFileSync(archive+'.verification.json',JSON.stringify(result,null,2)+'\n');
-}finally{rmSync(temp,{recursive:true,force:true});}
+}finally{assert.ok(temp.startsWith(realpathSync(tmpdir())+'/gaoding installed package '));rmSync(temp,{recursive:true,force:true});}

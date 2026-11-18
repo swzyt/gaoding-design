@@ -1,67 +1,110 @@
-# 从话题研究到完整投稿
+# 从实时话题到原生可编辑投稿
 
-这是当前执行规范。总控推进确定性步骤；Agent 负责研究、完整 prompt、素材修补决策与实际看图验收。`auto` 会投稿，仅在用户授权投稿后运行。
+这是当前执行规范。**新任务默认 native + agent：本地原生排版、独立图像素材、DSH 图像能力交接、浏览器登记与投稿；默认流程不调用 GD CLI。** Agent 负责创意、完整素材 prompt、真实工具操作和视觉验收；总控负责确定性处理、哈希、持久状态与恢复。`auto` 会最终投稿，仅在用户授权投稿时运行。
 
-## 安装与运行路径
+## 安装、目录与唯一浏览器空间
 
-DSH 首次调用 `gaoding_topics` 读取技能、路径和依赖状态。`gaoding_workflow` 参数 `["bootstrap"]` 安装锁定的 Pillow、ag-psd、pngjs；用 `["status",返回的directory]` 等待退出码为 0，再调用 `["doctor"]` 并等成功。所有非 status 命令后台执行，工具返回不代表完成。
+1. 先调用 `gaoding_topics` 读取完整 guide、workflowGuide、实际路径及目录状态。面板打开时实时刷新，来源是 `https://creator.huaban.com/inspiration`；不是语雀教程目录或历史五项列表。接口需要登录时，读取现有登录浏览器真实响应，不读取或保存认证头。
+2. 复用返回的 `space` 作为整个目标唯一 TaskSpace。已有目标空间时传 `gaoding_topics {space:实际ID,refresh:true}`，不要再建第二个。目录读取用独立临时 Page，不覆盖编辑器页。目录返回 `complete/partial/unavailable`、时间、数量；失败不把缓存当实时成功。
+3. 首次 `gaoding_workflow ["bootstrap"]`，用 `["status",directory]` 等退出0，再 `["doctor"]`。需要全局 ego-browser、Node、npm、Python；默认 bootstrap 与 doctor 均不检查或执行 GD CLI，也不运行其参考图编码测试。仅显式 `["bootstrap","--legacy-cli"]` 或 `["doctor","--legacy-cli"]` 验证可选 GD CLI 兼容工具及参考图编码；bootstrap 未知参数会明确报错，依赖安装或兼容检查失败会以非零退出，不得视为初始化成功。插件不偷偷安装或覆盖全局工具。当前仅验证 macOS，中文预览使用系统字体。
+4. 数据默认 `~/.local/share/dsh-gaoding-publisher`：runs、subscriptions、catalog、research-cache、dependencies、operations；工具返回路径为准。`GAODING_DATA_DIR`、`GAODING_RUNTIME_HOME` 可显式指定数据/依赖根目录；`GAODING_WORKSPACE` 仅开发切换源码。运行包不依赖原开发工作区。
 
-GD CLI、ego-browser、Node、npm、Python 必须由用户环境提供；不会随插件安装。当前只验证 macOS，预览与证明图使用系统中文字体。`doctor` 包含参考图编码回归；CLI 升级后若失败先诊断，不能跳过或自动覆盖全局包。见 `../fixes/README.md`。
+## 话题、启动与恢复
 
-源码运行可直接使用根目录 `workflow.sh`；默认依赖在 pipeline。插件运行数据默认 `~/.local/share/dsh-gaoding-publisher`：`runs/`、`subscriptions/`、`research-cache/`、`dependencies/`、`operations/`。工具返回路径为准。`GAODING_DATA_DIR` 指定数据根目录，`GAODING_RUNTIME_HOME` 指定依赖目录；`GAODING_WORKSPACE` 仅供开发显式切换源码。
-
-## 启动与恢复
-
-使用 ego-browser 技能建立一个 TaskSpace，确认 p1 页面；查询当前账户真实 DAM 库 ID，不复制历史账号。已选题直接用返回 key 登记 `gaoding_subscribe`，随后逐个执行返回的 args。
+用户已选题、选全部或授权随机时不重复询问。调用 `gaoding_subscribe` 传当前目录 key 和同一 `space`；`repositoryId` 可省略，只有已经查到真实当前库 ID 才传，不用历史账号或虚构占位值。每题快照落盘，通过 `--topic-json` 贯通总控和研究器，分别保存规范 URL 和样例 hub。目录中缺链接的话题仍显示；研究无法明确找到唯一详情页时如实停止，不套其他题规范。
 
 ```text
-gaoding_workflow args=["auto","绝对运行目录","--topic","tour","--space","本次ID","--repository-id","当前库ID","--watch"]
-gaoding_workflow args=["status","同一绝对运行目录"]
+gaoding_workflow args=["auto","绝对运行目录","--topic","动态key","--topic-json","本题快照绝对路径","--space","本次ID","--mode","native","--registration","agent","--watch"]
+gaoding_workflow args=["status","同一运行目录"]
 ```
 
-随机抽题仅在用户要求时省略 `--topic`。选题、空间和库一经记录，续跑参数必须一致。同目录的重复活动启动返回已有状态，不会重发。`--watch` 在后台等待 Agent；不要重复启动来推进 gate。退出后只在明确恢复原因时用原参数续跑。启动记录不确定时先核查 PID、日志和 run.json；不得直接删锁、删任务回执或伪造 done。
+订阅返回的 args 优先，多个话题串行运行。新 native 任务必须先冻结本次选题；明确随机授权时，Agent 在完整实时目录的可参与题中随机选一次、记录方法并登记，不能从历史五项池声称全目录随机。
 
-一个目标仅用一个 TaskSpace；多个话题顺序执行。总控仅并行相互独立的分层调用，以及登记、来源证明、编辑器准备。图片生成任务一旦存在 taskId 就查询原任务；submission-started 不确定时禁止重复投稿。
+选题快照、space、repository、mode、registration 一经保存续跑必须一致。已有旧 run 无 mode 字段按 gd-cli/gd-cli 恢复，不在中途切换路线。新任务仅显式 `--mode gd-cli --registration gd-cli --repository-id 真实ID` 才走旧母稿/双分层路线；不作自动降级，也不承诺旧CLI免费。独立 `job/masters/register` 仍是显式CLI兼容命令。任务不确定时先查询原任务/上传/发布记录，禁止重发、删锁或手改 run.json 标 done。
 
-## 阶段与 Agent 验收门
+若旧TaskSpace确已消失，遵守ego-browser技能先取得用户的新空间恢复授权；之后可用 `recover-space 运行目录 --previous-space 旧ID --space 新ID --user-authorized`。命令实时核实旧空间缺失、新空间由Agent持有、进程已退出、无其它写锁且有原作品永久URL，只更新空间绑定并另存恢复历史，所有阶段/作品ID/素材和开始时间保持不变。续跑沿用原参数仅改space；原订阅保持历史记录。禁止把该命令当无授权自动重建或重新导入捷径。
 
-1. `research_collect`：实际进话题详情页，保存 TOP1–TOP3 和列表前七张、来源、截图、完整规范、规范图片。不是完整前十排名时如实描述。缓存按内容哈希校验，实时来源变化则失效。
-2. `01-creative`：实际打开十张图和规范示例，分析面积比例、阅读顺序、景深、遮挡、图片组成、文字层级、光向、材质、用途及原创迁移原则；标记重复系列。写 `research/analysis.md` 和 `research-review.json`（`passed:true`、`samples` 十条具体分析）。缓存命中也复核当前规范，只复用研究，不复用旧 prompt。
-3. 写 `research/creative-brief.json`，本轮恰好一个方向。`research` 包含 `sources:"sources.json"`、`analysis:"analysis.md"`；`concepts` 中每项必须有安全目录 `id`、`concept`、`reading_path`、`zones`、`depth_plan`、`lighting_material`、`copy`、`layers`、完整 `master_prompt`、`width`、`height`。详细字段以 `../generate_masters.py:prepare` 为准。prompt 必须由 Agent 独立写全，不能代码拼接或套固定坐标。研究图不附到生产请求。
-4. `02-master`：看实际母稿，检查构图、文案、人物脸手、信息密度、材质和可分层性。弱视觉不能通过。需要重做时保留原任务记录，新请求用新目录，先修正流程输入再续跑。
-5. `parallel_split`：布局分层与智能分层并行，每个任务独立保存请求、taskId、结果和资源。自动结果不能直接当成成品。
-6. `03-materials-NN`：逐张检查透明像素、人物边缘、文字是否烘焙、背景是否完整、是否残留第二个人物。人物与黑色场景必须分开且背景不能缺失。Agent 写 `release-recipe.json`；合格响应 `action:"build"`。需修补响应 `action:"repair"`、`jobs:[{id,directory,tool,input,localize?}]`，使用公开 CLI schema，精确修补有问题的素材，再进入下一轮验收。
-7. `build` 生成独立 PNG、PSD、原生文字及素材包；`parallel_prepare` 登记 DAM、准备来源证明、导入编辑器并验证字体；`bind_assets` 将每个图片层绑定真实 DAM 素材。
-8. `layer_audit` 逐对隐藏主体/背景，再恢复并刷新确认；原透明度先持久化，失败自动恢复。若中断恢复为 `recovered-needs-review`，必须实看恢复截图后重跑，不能标成功。
-9. `04-final`：看每张隐藏截图、刷新恢复图、每画板编辑器图并对照母稿；检查层的独立性、透明边缘、文字可编辑、字体、裁切、间距与来源。写 `release/visual-review.json`（`passed:true,spec_sha256,checks`）和 `material-review.json`（`passed:true,bindings_sha256,checks`），哈希必须来自当前文件。不能凭文件存在或图层数量通过。
-10. 总控继续 `copyright_and_form → submit → complete_declaration → reopen_verify → package`。所有图片先登记、绑定再声明，图片层数必须等于候选数量。AI 来源用 `original_ai`，程序绘制用 `original`；分别上传真实证明。重新打开发布管理和版权面板检查保存结果。审核中、审核通过、审核不通过按实际显示，不混称。
+所有非 status 命令立即后台返回；启动不代表完成。`--watch` 等待 Agent gate，有进程时不要重复启动。只预览用 `preview 配方 --output 路径`、`build 配方` 等手动阶段，不运行 auto。
 
-### 版权声明入口（2026-11-06 实测，勿按旧记忆找面板）
+## Native 默认阶段与交接契约
 
-- 发布列表入口是 **我的 → 发布 → 内容卡片右下角「…」→「版权认证」**，点开即「版权声明」弹窗。
-- 编辑器右上角那个叫「**版权说明**」，只是一段文案（“当前作品无版权风险…”），**不是**声明面板；按「版权说明/声明面板」去搜索会误判成“平台没提供”。
-- 发布成功弹窗里可能有「去完善」直达同一弹窗，但不是必现，不能作为唯一入口。
-- 弹窗结构：未分类 / 稿定素材 / **原创素材** / **原创 AI 素材** / 非原创素材 五个拖拽分区，选择器前缀 `.ugc-copyright-section-<分类>`；缩略图 `.ugc-copyright-thumb`（带 `data-candidate-id`），证明材料 `.ugc-copyright-evidence-thumb`。
-- 提交前必须：未分类为 0、每类图片数与登记表一致、每个用到的分类都有证明材料、勾选「我知悉并勾选《确权声明》」，再点「声明并发布」。
-- 分区已只读（`.is-readonly`、file input `disabled`）说明声明已保存；必须重新从同一入口打开确认分类和材料仍在，才算核验通过。
-- 代码：`copyright.js:openPanel` 负责走这个入口；`publish.js` 的 `verify`/`completeDeclaration` 都复用它，不要再写自定义选择器。
+### 研究与创意
 
-每个 gate 的 `request.json` 给出当前 token、输入哈希和要求。完成实际观察与指定文件后，原子写 `response.json`，包括 `passed:true`、相同 `token`、具体观察的 `checks`，以及该阶段要求的 action。失败就记录具体原因，不写假的通过结果。输入变化后旧响应必须归档重审。
+`research_collect` 实看当前话题 TOP1–TOP3 与列表前七张、完整规范及规范图。保存来源、截图、字节哈希；列表七张不称额外七张排名。缓存只复用有哈希的研究，并复核本次实时规范。
 
-## 配方与可编辑性
+`01-creative`：Agent 打开十张样例和规范，写 research/analysis.md、research-review.json（passed:true，samples十条逐张具体分析），标记重复系列。写 creative-brief.json：
 
-配方字段为 `canvas:{w,h}`、`topic`、`title`、`description`、`reference_master:"master.jpg"`、`layers`、`layer_audit:{pairs:[{subject,background}]}`。pairs 用图层语义名称，覆盖每个主要主体与背景/主要独立物件。
+- `research:{sources:"sources.json",analysis:"analysis.md"}`；`concepts` 恰好一个原创方向。
+- concept 必填 `id,concept,reading_path,zones,copy,layers,palette,typography`。不要程序拼接 prompt 或沿用旧坐标。
+- `layout_variants` 为2–4个真正不同的版式/配色方案，每项 `{id,recipe:"layout-a.json",rationale}`；recipe 文件都在 concept 根目录，素材相对该根目录。
+- `asset_plan:{assets:[{id,source:"assets/subject.png",require_alpha:true,...本素材完整prompt/独立背景/用途}]}`。仅列实际外部图片需求；纯文字/程序形状用 assets:[]。整幅海报不作为默认生图请求。
+- 新任务必须明确 `separation_contract:{schema_version:1,objects:[{id,layer_id,role,require_alpha,coverage?}]}`，按用户要求列出所有独立对象，不把整套场景写成一个物件。每个对象映射不同的 recipe layer ID；各层显式写相同的 role/require_alpha。`foreground` 必须 require_alpha:true；`background` 必须声明 `coverage:{box:[x,y,w,h],page?:"画板ID"}`，允许明确约定的局部背景，不默认要求每块背景都满画布。两个独立杯子可以复用同一图片文件，但不能共用同一图层。只有纯原生文字/形状且无外部图片才可显式 objects:[]。
 
-每层 `id`、`name` 唯一，`box:[x,y,w,h]`。图片提供 `type:"image"`、`source`（相对配方）、真实 `copyright_category`；透明主体加 `require_alpha:true`。形状提供 `type:"shape"`、`color`、`copyright_category:"original"`，可用 polygon/ellipse/blur。文字提供 `type:"text"`、`text`、`size`、`color`、PSD `font`、系统 `preview_font` 与稿定 `gd_font`；标题、日期、场馆、各档价格分别成层。
+契约冻结在 native-input.json 与 separation-contract.json；版式渲染、选版、进入浏览器前和最终审查复核来源/成品PNG哈希、透明和对象映射。每个非背景对象必须是 layer_audit.pairs 中单独的 subject。缺物件、同层冒充两个对象、缺有效透明区、PNG内容变化都会提前失败。旧已冻结任务没有契约时保留原恢复路径并明确 legacy-unverified，不能宣称通过新的结构验收。**结构检查不识别物件身份，也不能证明背景没有烘焙副本；仍须逐对象实看隐藏图和完整背景。**
 
-多画板加 `pages:[{id,name,canvas}]`，每个 layer 带 `page`，全稿层名和 ID 唯一。每画板导出 PSD、导入同一作品，登记及版权计数覆盖全部画板。
+总控冻结 native-input.json 与 asset-plan.json，生成 agent-assets/request.json。按层创作：独立完整背景、人物、物件，标题/日期/地点/价格保持原生文本；研究图不能附作生产参考素材。
 
-背景必须独立且完整；不能把整张照片当人物层。合成效果须接近母稿，不能为了增加层数而降低视觉质量。规范要求以本次网页为准，不机械填历史活动字段。
+### 素材与版式比较
 
-## 错误与交付
+`02-assets`：Agent 使用已经授权且可用的 DSH 图像插件、本地工具或原创素材；优先现有能力，不绑定付费服务，缺能力就记录实际缺项，不能自动调用 GD CLI。需要重型补全/整图拆层时显式选择合适后端，不把 skill 本身当分割模型。不确定的远程调用查询原 task/invocation，不新建假ID。
 
-`status` 返回真实 run、gate、日志与进程状态。已观察到发布成功并保存 `published:true` 的 submit 再执行只返回原记录，之后继续声明/核验，不再次点发布。成功回执尚未记录的 submission-started 需要核对发布管理后恢复，不可猜测。
+写 external-assets.json（或 agent-assets/response.json），详见 agent_assets.py：
 
-`complete` 必须包含 `delivery/results.json`、素材 ZIP、PSD、独立 PNG、图层表、配方、母稿、登记/绑定记录、真实任务及原创证明、版权保存核验与分层截图。报告 contentId、作品链接、审核状态、图片/文字层数、素材包路径和 `timing-report.json` 的实际墙钟耗时（包括 Agent 等待和修复）。
+```json
+{"schema_version":1,"token":"来自asset request","plan_sha256":"来自asset request","assets":[{"id":"subject","path":"assets/subject.png","sha256":"真实文件哈希","origin":"ai","tool":"实际工具","provider":"实际服务","model":"实际模型","task_id":"真实服务任务ID或null","invocation_id":"没有服务端任务时的真实DSH调用ID","input":{"prompt":"原始完整输入"},"status":"completed","evidence":[{"path":"evidence/tool-response.json","sha256":"真实文件哈希","kind":"tool-response"}]}]}
+```
 
-历史样例在仓库 archive 中，只供追溯；安装包不含它们。不能从旧案例拷贝坐标、账号、绝对路径或发布状态来运行新稿。
+AI 必须保存真实截图/原始工具响应，程序原创保存源码/执行记录。空计划也需同 token、plan_sha256、schema_version 的空 assets 响应。路径必须在本 concept 内，哈希、透明度、计划覆盖与版权分类均验证；不能拿另一张已完成任务替代。来源索引不等于版权证明，也不代表审核通过。
+
+纯文字/程序形状任务可在01-creative时一并写齐各候选原生recipe。总控只对冻结空素材计划、完整纯原生候选并经过素材校验的情况自动写真实空回执，省去02-assets交接；缺配方或存在外部图片仍正常交接。不得跳过03-layout实际看图。
+
+同时写各候选原生 recipe。总控用同一文字渲染器低成本生成全部预览（多画板逐页，不叠页），不生图、不打PSD、不上传。`03-layout` 实际看所有方案和每页，比较缩略图层级、对齐/留白、自然换行、字体搭配、整体配色、主体边缘和用途。响应增加 `selected_id`，并写具体观察。弱稿要修正输入并保留旧修订，不能为赶流程假通过。选定的本地预览保存 master.jpg，明确它是构图参考而不是AI母稿。
+
+### 构建、浏览器登记与编辑器验收
+
+`build` 生成独立 PNG、原生文字PSD、图层表及材料包。`05-register` 为浏览器登记交接：
+
+- 读取 release/registered-assets/request.json，先查当前真实库和已有上传，再上传精确的最终PNG；不确定先恢复，不重传。每层标题含内容哈希。
+- 写 release/registered-assets/response.json：`{token,assets:[{id,layer,title,sha256,category,asset_id,repository_id,state:"verified",url,evidence:{path,sha256}}]}`；evidence路径相对 release，必须是真实重新打开后的浏览器截图。
+- 程序检查覆盖数量、唯一实际ID、内容哈希、分类和证据。Agent 对实际库和图像负责，不能编造ID或截图。
+
+浏览器登记优先一次调用 `browser register-assets 配方 --space 当前ID --page 实际专用DAM页标签`，助手产出回执后实看登记图完成门审查，不重复手写上传脚本、查询或哈希。助手保留一次真实库重开，已有asset_id在首屏且DOM可见时批量核实，原图最多3项并发下载，缺失项回退UI查找；新上传保持串行和pending防重发。
+
+该命令：真实UI查询哈希标题后上传，先持久绑定当前库，下载原图核验SHA；未知pending只恢复核实、不重传。省略库ID时不改冻结请求，实际绑定写入独立状态。
+
+随后本地生成来源索引、原创程序记录；导入PSD，逐层通过真实font-id原生点击、checked状态与控件预览核实字体；云保存后重开原作品再次逐层检查。旧font-verification名称清单不能跳过检查。逐层替换绑定真实 DAM 素材。不要一边登记一边并发改同一编辑器页面。`layer_audit` 逐对隐藏主体/背景再恢复和刷新，失败自动恢复；`recovered-needs-review` 必须实看恢复图后重跑。
+
+`04-final` 前总控生成 `release/review-packet/agent-summary.md` 简明输入、`manifest.json` 完整明细和本地HTML索引，统一列出真实截图、来源证据、内容哈希与缺项，并提供 `passed:false` 审查草稿。也可运行 `review-packet 配方` 重新生成。索引不是证明、更不代表审查通过；正式review和gate必须由Agent在实看原图后填写。制作阶段同步保留源码、执行日志及真实截图，避免最后临时补证据。
+
+`04-final` 打开全部隐藏/恢复/编辑器截图，对照选定构图，确认独立完整背景、无烘焙主体副本、文字可编辑、字距行距、字体、裁切与来源。写 visual-review.json（passed、spec_sha256、checks）和 material-review.json（passed、bindings_sha256、evidence_sha256、checks）。
+
+版权证据写 concept/copyright-evidence.json：`{categories:{original:[{path,sha256,layers:[所覆盖ID]}],original_ai:[...]}}`，路径相对 concept。必须覆盖每个图片层；AI真实截图展示工具、完整prompt、模型、结果及必要参考输入；程序/照片提供实际过程或原照片证据。receipts.png 与 shape-evidence.png 是生成的索引，**禁止当平台证明上传**。证据清单哈希必须进入 material-review。
+
+之后 `copyright_and_form → submit → complete_declaration → reopen_verify → package`。新总控将稳定浏览器步骤按两段串行批量执行，每段只启动一次 ego-browser nodejs，同一 TaskSpace/Page 内复用现有函数：
+
+```text
+browser-batch prepare,bind,audit 配方 --space 实际ID --page 实际编辑器页
+browser-batch form,submit,declare,verify 配方 --space 实际ID --page 实际编辑器页 --final-review-gate 本run/gates/04-final
+```
+
+两段之间保留 04-final 的真实视觉审查，不允许组合跨越它。命令打开浏览器前先做 publication_preflight，发布段每步复核 gate 与当前文件哈希。不得用批次日志标记步骤成功或跳过操作；旧已开始的单阶段任务继续使用原检查点恢复。发布成功后版权步骤失败时，只有 publication.json 明确 published:true、有效阶段且标题/话题/描述匹配当前稿件，才跳过重新开表单并走既有 submit 幂等分支，再执行声明和核验；submission-started 不确定仍停止，不自动重发。
+
+总控写 browser-sequence.jsonl，记录每步开始/成功/失败、单调时钟耗时、尝试ID；timing-report.json 的 browser_steps 汇总失败和重跑，未结束步骤的时长保持未知。这些耗时已包含在原 machine spans 中，不再与总墙钟重复相加，也不推断其中模型思考、网络或人工等待的占比。单阶段 browser 命令仍保留供旧任务和定向恢复使用。
+
+真实的引用证据、请求和来源清单一起进入材料包，不仅交付一张索引图。审核中不等于上线/通过。
+
+## 配方与排版
+
+recipe 有 `canvas:{w,h,dpi?},topic,title,description,layers,layer_audit:{pairs:[{subject,background}]}`。每层 id/name 唯一、box:[x,y,w,h]。图片 type:image、source、真实copyright_category；透明主体 require_alpha:true。形状 type:shape、color、copyright_category:original，可 rectangle/ellipse/polygon/blur；简单图形先本地绘制。文字 type:text、text、size、color(RGB)、明确 font（PSD名称）、preview_font（系统文件）、gd_font（稿定实际可用字体）。各信息项独立层。
+
+文字 align:left/center/right（默认left）、line_height字号倍数（默认1.25）、letter_spacing像素（默认0）、stroke:[[r,g,b],整数像素宽]贯通预览和PSD。不可靠伪造字重代替字体。暂不支持非零rotation、复杂文字非零逐字距和未实现文字效果；明确报错，不默默变样。文字溢出报错。PSD的真实文字像素缓存仍位于同一可编辑文字层，不增加图片层；稿定导入后的重新排版仍需实看。
+
+多画板用 pages:[{id,name,canvas}]，每层显式page，ID/name全稿唯一；各页PSD导入同一作品，登记和版权覆盖全部画板。图层名语义化，layer_audit覆盖每个主主体与背景/主要独立物件，不用多余图层凑数。
+
+## 版权入口、状态与交付
+
+2026-11-06 实测声明入口：我的 → 发布 → 卡片右下角「…」→「版权认证」。编辑器右上角「版权说明」不是声明面板。未分类0、各分类图数与登记表一致、每类真实证明齐全，勾确权声明后发布，并从发布管理重新打开确认只读分类和材料仍在。入口统一复用 copyright.js:openPanel。
+
+gate/request.json 包含输入哈希、token及要求。实际观察并完成指定文件后，原子写 response.json（passed:true、正确token、具体checks，阶段需要的selected_id/action）。输入变化旧响应失效，先保留旧修订再重新审查。不能凭文件存在、工具成功或图层数量通过。
+
+完整交付须包括 results.json、作品链接/contentId、真实审核状态、PNG/PSD/ZIP、图层表、配方、构图预览、登记/绑定记录、原始来源证据、版权重开核验和分层截图。timing-report.json 包含 Agent 等待和修复的实际墙钟时间；不要用单次运行承诺速度/费用节省比例。已保存 published:true 不重复发布；submission-started不确定先核对真实发布管理。修复已有稿保留原contentId。

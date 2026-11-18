@@ -6,7 +6,7 @@
 
 1. 更新插件 package.json 版本，运行 `bash scripts/check.sh`。
 2. 仓库根运行 `mkdir -p dist`，再 `npm pack ./dsh-plugin-gaoding-publisher --pack-destination ./dist`。prepack 从白名单复制运行文件，包含运行依赖锁文件，不包含已安装依赖、用户资料、历史素材或凭证。
-3. 运行 `node scripts/verify-package.mjs dist/dsh-plugin-gaoding-publisher-0.3.4.tgz`，验证解包运行、CommonJS 模块边界、运行源码哈希和禁入文件。
+3. 运行 `node scripts/verify-package.mjs dist/dsh-plugin-gaoding-publisher-0.4.2.tgz`，验证解包运行、CommonJS 模块边界、运行源码哈希和禁入文件。
 4. 记录 `shasum -a 256 dist/*.tgz`，把验证结果留在 docs/VALIDATION.md。
 
 ## 独立 profile 测试
@@ -26,9 +26,9 @@ DSH_HOME=/absolute/temporary/dsh-home dsh --profile gaoding-test --dump-config
 
 ## 运行约束
 
-只声明 macOS 支持，字体证明依赖系统字体。工具用 PATH 找全局 GD CLI/Node/npm/ego-browser；桌面 DSH 的 PATH 需能找到这些程序。账户及 DAM ID 不进入源码。用户数据保留在独立 dataRoot，升级/卸载 npm 包不删除证据。
+只声明 macOS 支持，字体证明依赖系统字体。工具用 PATH 找全局 Node/npm/ego-browser；默认原生路线不需要 GD CLI。仅显式兼容路线需要全局GD CLI，doctor --legacy-cli才检查其参考图编码。桌面 DSH 的 PATH 需能找到实际所选后端的程序。账户及 DAM ID 不进入源码。用户数据保留在独立 dataRoot，升级/卸载 npm 包不删除证据。
 
-当前参考图回归针对已验证的 GD CLI 2.1.0 内部适配器；升级或原装版本回归失败时停止生产并诊断，不自动修改全局安装。不要通过删除该检查来发布。
+当前参考图回归针对已验证的 GD CLI 2.1.0 内部适配器；升级或原装版本回归失败时停止生产并诊断，不自动修改全局安装。保留此兼容检查；默认native不调用该CLI测试。
 
 ## 公共发布
 

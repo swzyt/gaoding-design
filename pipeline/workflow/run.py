@@ -16,28 +16,43 @@ def ego():
 
 def main():
  p=argparse.ArgumentParser(description=__doc__);sub=p.add_subparsers(dest='cmd',required=True)
- sub.add_parser('doctor')
- auto=sub.add_parser('auto');auto.add_argument('directory',type=Path);auto.add_argument('--space',type=int,required=True);auto.add_argument('--repository-id',required=True);auto.add_argument('--watch',action='store_true');auto.add_argument('--workers',type=int,default=3);auto.add_argument('--topic',help='Exact topic key or name; omit for random selection')
+ doctor=sub.add_parser('doctor');doctor.add_argument('--legacy-cli',action='store_true',help='Check optional GD CLI compatibility backend')
+ auto=sub.add_parser('auto');auto.add_argument('directory',type=Path);auto.add_argument('--space',type=int,required=True);auto.add_argument('--repository-id');auto.add_argument('--watch',action='store_true');auto.add_argument('--workers',type=int,default=3);auto.add_argument('--topic',help='Topic key or name; omit only with random authorization');auto.add_argument('--topic-json',type=Path);auto.add_argument('--mode',choices=['native','gd-cli']);auto.add_argument('--registration',choices=['agent','gd-cli'])
+ recovery=sub.add_parser('recover-space',help='Recover an explicitly authorized replacement TaskSpace without changing completed work');recovery.add_argument('directory',type=Path);recovery.add_argument('--previous-space',type=int,required=True);recovery.add_argument('--space',type=int,required=True);recovery.add_argument('--user-authorized',action='store_true',help='Confirm the user explicitly authorized replacing the disappeared original space')
  s=sub.add_parser('status');s.add_argument('concept',type=Path)
  j=sub.add_parser('job');j.add_argument('request',type=Path);j.add_argument('output',type=Path)
  l=sub.add_parser('localize');l.add_argument('template',type=Path);l.add_argument('output',type=Path)
  b=sub.add_parser('build');b.add_argument('recipe',type=Path)
+ preview_parser=sub.add_parser('preview');preview_parser.add_argument('recipe',type=Path);preview_parser.add_argument('--output',type=Path)
+ review=sub.add_parser('review-packet',help='Prepare review evidence and unapproved drafts; never approve or publish');review.add_argument('recipe',type=Path)
  u=sub.add_parser('register');u.add_argument('recipe',type=Path);u.add_argument('--repository-id',required=True)
  r=sub.add_parser('receipts');r.add_argument('concept',type=Path)
  m=sub.add_parser('masters');m.add_argument('brief',type=Path);m.add_argument('output',type=Path);m.add_argument('--check',action='store_true')
- browser=sub.add_parser('browser');browser.add_argument('phase',choices=['prepare','bind','audit','form','update','submit','declare','verify']);browser.add_argument('recipe',type=Path);browser.add_argument('--space',type=int,required=True);browser.add_argument('--page',default='p1')
+ browser=sub.add_parser('browser');browser.add_argument('phase',choices=['register-assets','prepare','bind','audit','form','update','submit','declare','verify']);browser.add_argument('recipe',type=Path);browser.add_argument('--space',type=int,required=True);browser.add_argument('--page',default='p1')
+ batch=sub.add_parser('browser-batch',help='Run one fixed serial sequence in one browser runtime; never skips from logs');batch.add_argument('sequence',choices=['prepare,bind,audit','form,submit,declare,verify']);batch.add_argument('recipe',type=Path);batch.add_argument('--space',type=int,required=True);batch.add_argument('--page',default='p1');batch.add_argument('--final-review-gate',type=Path);batch.add_argument('--log',type=Path);batch.add_argument('--attempt-id')
  a=p.parse_args()
+ if a.cmd=='browser-batch' and a.sequence=='form,submit,declare,verify' and not a.final_review_gate:p.error('publication batch requires --final-review-gate from the completed 04-final Agent review')
  if a.cmd=='auto':
-  command=[sys.executable,str(ROOT/'workflow/orchestrator.py'),str(a.directory.resolve()),'--space',str(a.space),'--repository-id',a.repository_id,'--workers',str(a.workers)]
+  command=[sys.executable,str(ROOT/'workflow/orchestrator.py'),str(a.directory.resolve()),'--space',str(a.space),'--workers',str(a.workers)]
+  if a.repository_id:command.extend(['--repository-id',a.repository_id])
   if a.watch:command.append('--watch')
   if a.topic:command.extend(['--topic',a.topic])
+  if a.topic_json:command.extend(['--topic-json',str(a.topic_json.resolve())])
+  if a.mode:command.extend(['--mode',a.mode])
+  if a.registration:command.extend(['--registration',a.registration])
   subprocess.run(command,check=True)
+ elif a.cmd=='recover-space':
+  from orchestrator import recover_space
+  print(json.dumps(recover_space(a.directory,a.previous_space,a.space,a.user_authorized),ensure_ascii=False,indent=2))
  elif a.cmd=='doctor':
-  for command in ['gd-cli','node','npm']:
+  for command in ['node','npm']:
    if not shutil.which(command):raise RuntimeError('Missing '+command)
   print('ego-browser:',ego());print('Python:',sys.executable)
-  subprocess.run(['gd-cli','--version'],check=True)
-  subprocess.run(['node',str(ROOT/'fixes/test-reference-wire.mjs')],check=True)
+  print('Default backend: native layouts + Agent image tools + browser registration (no GD CLI)')
+  if a.legacy_cli:
+   if not shutil.which('gd-cli'):raise RuntimeError('Optional GD CLI backend is not installed')
+   subprocess.run(['gd-cli','--version'],check=True)
+   subprocess.run(['node',str(ROOT/'fixes/test-reference-wire.mjs')],check=True)
   env=dict(os.environ,NODE_PATH=os.environ.get('NODE_PATH',str(ROOT/'workflow/node_modules')))
   subprocess.run(['node','-e',"require('ag-psd');require('pngjs');console.log('PSD dependencies ready')"],env=env,check=True)
  elif a.cmd=='status':
@@ -54,6 +69,12 @@ def main():
   request=json.loads(a.request.read_text());result=run(a.output,request['tool'],request['input']);print(json.dumps(download_resources(a.output,result),ensure_ascii=False))
  elif a.cmd=='localize':print(json.dumps(localize(a.template,a.output),ensure_ascii=False))
  elif a.cmd=='build':build(a.recipe)
+ elif a.cmd=='preview':
+  from assemble import preview
+  print(preview(a.recipe,a.output))
+ elif a.cmd=='review-packet':
+  from review_packet import build_packet
+  print(json.dumps(build_packet(a.recipe.resolve()),ensure_ascii=False,indent=2))
  elif a.cmd=='register':register(a.recipe,a.repository_id)
  elif a.cmd=='receipts':
   subprocess.run([sys.executable,str(ROOT/'workflow/receipts.py'),str(a.concept.resolve())],check=True)
@@ -62,11 +83,24 @@ def main():
   cmd=[sys.executable,str(ROOT/'generate_masters.py'),str(a.brief.resolve()),str(a.output.resolve())]
   if a.check:cmd.append('--check')
   subprocess.run(cmd,check=True)
+ elif a.cmd=='browser-batch':
+  from publication_preflight import validate as preflight
+  preflight(a.recipe.resolve())
+  options={'sequence':a.sequence}
+  if a.final_review_gate:options['finalReviewGate']=str(a.final_review_gate.resolve())
+  if a.log:options['logPath']=str(a.log.resolve())
+  if a.attempt_id:options['attemptId']=a.attempt_id
+  # One runtime, one Page object, JSON literals over stdin (no shell quoting).
+  script=f"const p=(await taskSpace({a.space})).page({json.dumps(a.page)});\nconst m=await import({json.dumps(str(ROOT/'workflow/browser_sequence.js'))});\nconsole.log(await m.default.runSequence(p,{json.dumps(str(a.recipe.resolve()))},{json.dumps(options)}));\n"
+  subprocess.run([ego(),'nodejs'],input=script,text=True,check=True)
  elif a.cmd=='browser':
-  method={'prepare':'prepare','bind':'bind','audit':'audit','form':'prepareForm','update':'prepareUpdate','submit':'submit','declare':'completeDeclaration','verify':'verify'}[a.phase]
-  module=ROOT/('workflow/layer_audit.js' if a.phase=='audit' else 'workflow/bind_assets.js' if a.phase=='bind' else 'workflow/publish.js')
+  method={'register-assets':'register','prepare':'prepare','bind':'bind','audit':'audit','form':'prepareForm','update':'prepareUpdate','submit':'submit','declare':'completeDeclaration','verify':'verify'}[a.phase]
+  module=ROOT/('workflow/dam_browser.js' if a.phase=='register-assets' else 'workflow/layer_audit.js' if a.phase=='audit' else 'workflow/bind_assets.js' if a.phase=='bind' else 'workflow/publish.js')
+  target=a.recipe.resolve()
+  if a.phase=='register-assets':
+   recipe=json.loads(target.read_text());target=target.parent/recipe.get('output','release')/'registered-assets/request.json'
   # JSON is embedded only into JavaScript over stdin, never into a shell command.
-  script=f"const p=(await taskSpace({a.space})).page({json.dumps(a.page)});\nconst m=await import({json.dumps(str(module))});\nconsole.log(await m.default.{method}(p,{json.dumps(str(a.recipe.resolve()))}));\n"
+  script=f"const p=(await taskSpace({a.space})).page({json.dumps(a.page)});\nconst m=await import({json.dumps(str(module))});\nconsole.log(await m.default.{method}(p,{json.dumps(str(target))}));\n"
   subprocess.run([ego(),'nodejs'],input=script,text=True,check=True)
 
 if __name__=='__main__':main()

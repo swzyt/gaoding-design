@@ -1,15 +1,53 @@
-# -*- coding: utf-8 -*-
-import json,hashlib,sys
+"""Index actual recipe/source/shape hashes; never pretend this is tool UI proof."""
+import argparse
 from pathlib import Path
-from PIL import Image,ImageDraw,ImageFont
-root=Path(sys.argv[1]).resolve();recipe=json.loads((root/'release-recipe.json').read_text());out=root/'release'
-shapes=[x for x in recipe['layers'] if x['type']=='shape'];im=Image.new('RGB',(1600,300+250*len(shapes)), '#faf8f2');d=ImageDraw.Draw(im)
-f=lambda n:ImageFont.truetype('/System/Library/Fonts/Supplemental/Songti.ttc',n)
-d.text((60,40),'独立几何素材制作记录',font=f(44),fill='#232323');d.text((60,110),'来源：本项目排版配方与 Pillow 绘制；非 AI 图像生成',font=f(28),fill='#333333')
-d.text((60,160),'对应作品：'+recipe['title'],font=f(27),fill='#333333')
-for i,row in enumerate(shapes):
- y=240+i*250;source=out/'assets'/(row['id']+'.png');asset=Image.open(source).convert('RGBA');asset.thumbnail((240,150));im.paste(asset,(60,y),asset)
- d.text((340,y),row['name'],font=f(28),fill='#232323');d.text((340,y+45),'ID: '+row['id']+'  /  box: '+str(row['box']),font=f(24),fill='#333333')
- d.text((340,y+85),'color: '+str(row['color'])+'  blur: '+str(row.get('blur',0)),font=f(24),fill='#333333')
- sha=hashlib.sha256(source.read_bytes()).hexdigest();d.text((340,y+125),'SHA256: '+sha[:40],font=f(22),fill='#333333');d.text((340,y+158),sha[40:],font=f(22),fill='#333333')
-d.text((60,im.height-50),'完整配方与源代码随素材包提供，可重复生成并校验哈希。',font=f(24),fill='#555555');im.save(out/'shape-evidence.png')
+
+from PIL import Image, ImageDraw, ImageFont
+
+try:
+    from . import agent_assets
+except ImportError:
+    import agent_assets
+
+
+def generate(concept):
+    root = Path(concept).resolve()
+    recipe_path = root / 'release-recipe.json'
+    recipe = agent_assets.load(recipe_path)
+    out = agent_assets._control_path(root, 'release')
+    shapes = [row for row in recipe['layers'] if row['type'] == 'shape']
+    records = []
+    for row in shapes:
+        if row.get('copyright_category') != 'original':
+            raise ValueError('Programmatic shapes must be classified original')
+        source = agent_assets.safe_path(root, 'release/assets/' + row['id'] + '.png')
+        agent_assets._image(source)
+        records.append(dict(id=row['id'], name=row['name'], recipe=row, path=str(source.relative_to(root)), sha256=agent_assets.digest(source)))
+    renderer = Path(__file__).with_name('assemble.py')
+    report = dict(schema_version=1, origin='programmatic', tool='workflow.assemble',
+                  recipe=dict(path='release-recipe.json', sha256=agent_assets.digest(recipe_path)),
+                  source_code=dict(path='pipeline/workflow/assemble.py', sha256=agent_assets.digest(renderer)),
+                  assets=records,
+                  notice='Generated recipe/hash index, not an execution receipt or platform-required screenshot. Retain actual source code, recipe and tool evidence separately.')
+    agent_assets.atomic_json(out / 'shape-provenance.json', report)
+    lines = ['PROGRAMMATIC SHAPE INDEX - NOT A TOOL SCREENSHOT',
+             'Recipe SHA256: ' + report['recipe']['sha256'],
+             'Renderer SHA256: ' + report['source_code']['sha256'],
+             'Original recipe/source and assets are required to reproduce and verify.']
+    lines.extend(row['id'] + ' SHA256: ' + row['sha256'] for row in records)
+    image = Image.new('RGB', (1400, 50 + 30 * len(lines)), 'white')
+    draw = ImageDraw.Draw(image)
+    for i, line in enumerate(lines):
+        draw.text((20, 20 + 30 * i), line.encode('ascii', 'backslashreplace').decode('ascii'), font=ImageFont.load_default(), fill='black')
+    image.save(out / 'shape-evidence.png')
+    return report
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('concept', type=Path)
+    generate(parser.parse_args().concept)
+
+
+if __name__ == '__main__':
+    main()

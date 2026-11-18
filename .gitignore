@@ -12,6 +12,7 @@ log-*.txt
 archive/
 dist/
 .dsh-test/
+.local-research/
 dsh-plugin-gaoding-publisher/runtime/
 **/.plugin-process*.json
 **/.plugin-launch.lock/
@@ -22,3 +23,13 @@ dsh-plugin-gaoding-publisher/runtime/
 .env.*
 !.env.example
 .npmrc
+
+# 研究素材与临时产物不入库（体积大、含第三方内容）
+docs/creator-center/assets/
+docs/creator-center/sources/
+docs/examples/*.png
+docs/examples/*.jpg
+dsh-image-gen/
+dsh-plugin-gaoding-plugin-tmp/
+dsh-plugin-gaoding-publisher/runtime/
+output/

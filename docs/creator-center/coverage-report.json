@@ -1,0 +1,28 @@
+{
+  "collectedDate": "2026-11-06",
+  "timezone": "Asia/Shanghai",
+  "directoryDocuments": 70,
+  "records": 73,
+  "missingDirectoryDocuments": [],
+  "articleCount": 72,
+  "supplementaryArticles": 2,
+  "perDocumentAnalyses": 73,
+  "collectionErrors": [],
+  "uniqueImageSources": 1236,
+  "localAssets": 336,
+  "referencedAssets": 900,
+  "assetErrors": [],
+  "missingImageSources": 0,
+  "localAssetBytes": 541929507,
+  "visualReview": {
+    "imagesOpened": 11,
+    "sourceArticles": 5,
+    "allImagesReviewed": false
+  },
+  "scopeExclusions": [
+    "知识库外第三方文档、工具、视频逐帧内容",
+    "实时话题目录和登录后账户页面",
+    "全部历史配图逐张视觉验收"
+  ],
+  "noGenerationOrPublication": true
+}

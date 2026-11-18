@@ -1,0 +1,4 @@
+# Public research media stay local; URLs and hashes remain in the tracked index.
+# Keep large historical illustrations out of source-control and plugin packages.
+assets/
+__pycache__/

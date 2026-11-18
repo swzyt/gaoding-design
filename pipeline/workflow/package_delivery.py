@@ -14,6 +14,8 @@ def package(output,concepts,research):
   layers=json.loads((r/'spec.json').read_text())['layers'];review=json.loads((r/'visual-review.json').read_text())
   if review['spec_sha256']!=hashlib.sha256((r/'spec.json').read_bytes()).hexdigest():raise ValueError('Spec changed since review')
   build(concept/'release-recipe.json')
+  from provenance_bundle import attach
+  attach(concept,r/'materials.zip')
   if review['spec_sha256']!=hashlib.sha256((r/'spec.json').read_bytes()).hexdigest():raise ValueError('Rebuild changed reviewed spec')
   results.append(dict(state,imageLayers=sum(x['type']=='image' for x in layers),textLayers=sum(x['type']=='text' for x in layers)))
   dest=output/(concept.name+'-materials.zip');shutil.copyfile(r/'materials.zip',dest);files.append(dest)

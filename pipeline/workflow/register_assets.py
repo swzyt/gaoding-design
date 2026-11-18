@@ -10,7 +10,7 @@ def register(recipe_path,repository_id):
  rows=[]
  for layer in recipe['layers']:
   if layer['type']=='text':continue
-  if layer.get('copyright_category') not in ('original','original_ai'):raise ValueError('Assign an evidence-backed copyright_category before registration: '+layer['name'])
+  if layer.get('copyright_category') not in ('original','original_ai','non_original'):raise ValueError('Assign an explicit supported copyright_category before registration: '+layer['name'])
   asset=out/'assets'/(layer['id']+'.png');sha=hashlib.sha256(asset.read_bytes()).hexdigest();receipt=dest/(layer['id']+'.json');marker=dest/(layer['id']+'.upload-started.json')
   title=recipe['title'].split(' ')[0]+'-'+layer['name']+'-v2'
   request={'source':str(asset),'sha256':sha,'repository_id':str(repository_id),'folder_id':'0','title':title}
