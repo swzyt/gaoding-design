@@ -37,6 +37,7 @@
 ## 话题与规范控制台
 
 [插件说明](dsh-plugin-gaoding-publisher/README.md)：左侧导航「稿定投稿」打开控制台，四个标签页覆盖话题与规范、创作、结果与投稿、已投稿。支持全自动链路（prompt → 出图 → 排版 → 投稿 → 版权声明 → 回读核验），出图默认复用 DSH 已登录的订阅凭据，不消耗稿豆。
+[使用教程](dsh-plugin-gaoding-publisher/USAGE.md)按步骤讲从环境自检到投稿、批量与故障排查；
 [版本变更](dsh-plugin-gaoding-publisher/CHANGELOG.md)记录 0.29 以来的关键修复；工程细节与踩坑记录见[能力演进笔记](docs/SPEC-CATALOG.md)。
 
 ## 0.4 优化

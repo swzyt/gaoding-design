@@ -1,6 +1,6 @@
 {
   "name": "dsh-plugin-gaoding-publisher",
-  "version": "0.41.2",
+  "version": "0.41.3",
   "description": "话题与创作规范控制台：实时话题、公开规范库、登录态检测与后续创作投稿",
   "type": "module",
   "main": "index.js",
@@ -31,6 +31,7 @@
     "locale",
     "icon.svg",
     "README.md",
+    "USAGE.md",
     "template-declaration.js",
     "auto-publish.js",
     "browser-space.js",
